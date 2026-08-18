@@ -1,0 +1,42 @@
+{
+  "/auth": {
+    "target": "http://localhost:8082",
+    "secure": false
+  },
+  "/job": {
+    "target": "http://localhost:8082",
+    "secure": false
+  },
+  "/applications": {
+    "target": "http://localhost:8082",
+    "secure": false
+  },
+  "/applicant": {
+    "target": "http://localhost:8082",
+    "secure": false
+  },
+  "/ats": {
+    "target": "http://localhost:8082",
+    "secure": false
+  },
+  "/round1": {
+    "target": "http://localhost:8082",
+    "secure": false
+  },
+  "/round2": {
+    "target": "http://localhost:8082",
+    "secure": false
+  },
+  "/coding": {
+    "target": "http://localhost:8082",
+    "secure": false
+  },
+  "/round3": {
+    "target": "http://localhost:8082",
+    "secure": false
+  },
+  "/interview": {
+    "target": "http://localhost:8082",
+    "secure": false
+  }
+}

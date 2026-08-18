@@ -1,0 +1,10 @@
+Frontend/.angular/
+Frontend/node_modules/
+Frontend/dist/
+Backend/target/
+.idea/
+.vscode/
+*.log
+Frontend/.angular/
+**/.gradle/
+**/build/

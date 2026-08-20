@@ -77,20 +77,21 @@ interface ChatMessage {
         <div class="video-grid" [class.with-sidebar]="showChat || showScorecard">
           <!-- Remote / Main Video Tile -->
           <div class="video-tile remote-tile">
-            <!-- 1. Presenting Screen Self Banner (Prevents Infinite Mirror Tunnel) -->
-            <div class="presenting-banner" *ngIf="isScreenSharing">
-              <div class="presenting-icon">🖥️</div>
-              <h3>You are presenting your screen to everyone</h3>
-              <p>Your screen is being shared live with the remote participant.</p>
-              <button class="btn btn-danger" style="margin-top: 14px; border-radius: 8px; font-weight: 600;" (click)="toggleScreenShare()">
+            <!-- Floating Presenting Screen Banner when local user presents -->
+            <div class="presenting-floating-bar" *ngIf="isScreenSharing">
+              <div class="presenting-bar-info">
+                <span class="presenting-pulse">🖥️</span>
+                <span>You are sharing your screen live</span>
+              </div>
+              <button class="btn btn-sm btn-danger" style="border-radius: 6px; font-weight: 600;" (click)="toggleScreenShare()">
                 ⏹️ Stop Presenting
               </button>
             </div>
 
-            <!-- 2. Remote Participant Stream / Remote Screen -->
-            <video #remoteVideo autoplay playsinline class="video-stream" [class.hidden]="!hasRemoteStream || isScreenSharing"></video>
+            <!-- Remote Participant Stream / Remote Screen -->
+            <video #remoteVideo autoplay playsinline class="video-stream" [class.hidden]="!hasRemoteStream"></video>
             
-            <div class="avatar-placeholder" *ngIf="!hasRemoteStream && !isScreenSharing">
+            <div class="avatar-placeholder" *ngIf="!hasRemoteStream">
               <div class="pulse-ring"></div>
               <div class="avatar-circle">
                 {{ (isRecruiter ? 'Candidate' : 'Recruiter').charAt(0) }}
@@ -101,7 +102,7 @@ interface ChatMessage {
               </div>
             </div>
 
-            <div class="tile-tag" *ngIf="hasRemoteStream && !isScreenSharing">
+            <div class="tile-tag" *ngIf="hasRemoteStream">
               <span>🟢 {{ isRemoteScreenSharing ? (isRecruiter ? 'Candidate (Presenting Screen)' : 'Recruiter (Presenting Screen)') : (isRecruiter ? 'Candidate (Live)' : 'Recruiter (Live)') }}</span>
             </div>
 
@@ -111,8 +112,16 @@ interface ChatMessage {
             </div>
           </div>
 
+          <!-- Local Screen Share Preview Tile (Self Screen) -->
+          <div class="video-tile screen-preview-tile" *ngIf="isScreenSharing">
+            <video #screenPreviewVideo autoplay playsinline muted class="video-stream"></video>
+            <div class="tile-tag local-tag">
+              <span>🖥️ Your Shared Screen</span>
+            </div>
+          </div>
+
           <!-- Local Video Tile (Self) -->
-          <div class="video-tile local-tile" [class.cam-off]="!isCameraOn">
+          <div class="video-tile local-tile" [class.cam-off]="!isCameraOn" [class.with-screen-sharing]="isScreenSharing">
             <video #localVideo autoplay playsinline muted class="video-stream" [class.hidden]="!isCameraOn"></video>
             
             <div class="avatar-placeholder local-ph" *ngIf="!isCameraOn">
@@ -152,13 +161,15 @@ interface ChatMessage {
           </div>
         </aside>
 
-        <!-- Sidebar 2: Recruiter Realtime Evaluation Scorecard -->
-        <aside class="sidebar-panel fade-in" *ngIf="showScorecard && isRecruiter">
+        <!-- Sidebar 2: Evaluation Scorecard & Candidate Notes -->
+        <aside class="sidebar-panel fade-in" *ngIf="showScorecard">
           <div class="sidebar-header">
-            <h4>📝 Recruiter Scorecard</h4>
+            <h4>{{ isRecruiter ? '📝 Recruiter Scorecard' : '📝 Interview Information & Notes' }}</h4>
             <button class="close-icon-btn" (click)="showScorecard = false">✕</button>
           </div>
-          <div class="scorecard-body">
+          
+          <!-- Recruiter View -->
+          <div class="scorecard-body" *ngIf="isRecruiter">
             <div class="form-group">
               <label class="form-label">Technical Problem Solving (1-10)</label>
               <input type="range" min="1" max="10" [(ngModel)]="scorecard.techScore" class="form-range" />
@@ -183,6 +194,24 @@ interface ChatMessage {
               <button class="btn btn-danger" style="flex:1;" (click)="endAndReject()" [disabled]="decisionLoading">
                 ✗ Reject Candidate
               </button>
+            </div>
+          </div>
+
+          <!-- Candidate View -->
+          <div class="scorecard-body" *ngIf="!isRecruiter">
+            <div class="info-card-panel" style="background: rgba(15,23,42,0.6); padding: 14px; border-radius: 8px; border: 1px solid #1e293b; font-size: 13px; color: #cbd5e1;">
+              <h5 style="color: #38bdf8; margin: 0 0 8px 0; font-size: 14px;">🎯 Round 4 Technical Interview</h5>
+              <p style="margin-bottom: 10px; line-height: 1.5;">Welcome to your live meeting session on SmartHireAI.</p>
+              <ul style="padding-left: 18px; margin: 0; line-height: 1.6; color: #94a3b8;">
+                <li>Keep your microphone and camera active.</li>
+                <li>Share your screen anytime using 🖥️ button.</li>
+                <li>Send text or links using 💬 chat panel.</li>
+              </ul>
+            </div>
+            
+            <div class="form-group" style="margin-top: 14px;">
+              <label class="form-label" style="font-size: 12px; color: #94a3b8; font-weight: 600;">Personal Scratchpad / Notes</label>
+              <textarea rows="6" [(ngModel)]="candidateNotes" class="form-control" placeholder="Type your notes or code explanations here..." style="width:100%; background:#1e293b; border:1px solid #334155; border-radius:6px; color:#fff; padding:10px; font-size:13px;"></textarea>
             </div>
           </div>
         </aside>
@@ -218,8 +247,8 @@ interface ChatMessage {
             <span class="unread-dot" *ngIf="hasUnreadChat"></span>
           </button>
 
-          <!-- Recruiter Scorecard Toggle -->
-          <button class="ctrl-btn" *ngIf="isRecruiter" [class.active]="showScorecard" (click)="toggleScorecard()" title="Evaluation Scorecard">
+          <!-- Notes & Scorecard Toggle (All 6 Icons Same for Candidate & Recruiter) -->
+          <button class="ctrl-btn" [class.active]="showScorecard" (click)="toggleScorecard()" [title]="isRecruiter ? 'Evaluation Scorecard' : 'Interview Information & Notes'">
             <span>📝</span>
           </button>
 
@@ -236,18 +265,41 @@ interface ChatMessage {
         </div>
       </footer>
 
-      <!-- CANDIDATE ANTI-CHEAT LOCK OVERLAY (BLOCKED AFTER 3 TAB SWITCHES) -->
+      <!-- CANDIDATE FULLSCREEN MANDATE OVERLAY (WITH SPLIT-SCREEN DEMO OPTION) -->
+      <div class="fullscreen-blocker-overlay fade-in" *ngIf="!isRecruiter && !isFullscreen && !isBlocked && !dismissedFullscreenPrompt">
+        <div class="blocker-card">
+          <div class="blocker-icon">🖥️</div>
+          <h2>Fullscreen & Split-Screen Mode</h2>
+          
+          <div>
+            <p class="blocker-desc">
+              For best experience, conduct Round 4 in <b>Fullscreen Mode</b>.<br>
+              Split-screen demo mode is supported for local dual-window testing.
+            </p>
+            <div style="display: flex; gap: 12px; justify-content: center; margin-top: 20px;">
+              <button class="btn btn-primary btn-md" style="background:#0284c7; border:none; padding: 10px 22px; border-radius: 8px; font-weight: 700;" (click)="enterFullscreen()">
+                🔒 Enter Fullscreen
+              </button>
+              <button class="btn btn-ghost btn-md" style="border: 1px solid #334155; padding: 10px 20px; border-radius: 8px; color: #cbd5e1; font-weight: 600;" (click)="dismissFullscreenPrompt()">
+                📐 Split-Screen Demo Mode
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CANDIDATE ANTI-CHEAT LOCK OVERLAY (BLOCKED AFTER MAX VIOLATIONS) -->
       <div class="fullscreen-blocker-overlay fade-in" *ngIf="!isRecruiter && isBlocked">
         <div class="blocker-card">
           <div class="blocker-icon">🚫</div>
-          <h2>Interview Blocked - Tab Switching Policy</h2>
+          <h2>Interview Blocked - Anti-Cheat Violation</h2>
           
           <div>
             <p class="blocker-desc" style="color: #f87171;">
-              You have been blocked for switching tabs <b>{{ candidateViolations }}/{{ maxViolations }} times</b> during the interview.
+              You have been blocked for multiple tab switches or exiting fullscreen <b>({{ candidateViolations }}/{{ maxViolations }} violations)</b> during the interview.
             </p>
             <p style="font-size: 13px; color: #94a3b8;">
-              Your interviewer has been notified. Please wait for the recruiter to review and unblock your session.
+              Your recruiter has received an alert. Please wait for the recruiter to review and unblock your session.
             </p>
           </div>
         </div>
@@ -343,17 +395,20 @@ interface ChatMessage {
     .violation-tile-tag { top: 12px; right: 12px; bottom: auto; left: auto; background: #dc2626; font-weight: 700; }
     .muted-tag { color: #f87171; font-weight: bold; }
 
-    .presenting-banner {
-      display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
-      padding: 30px; background: radial-gradient(circle at center, rgba(56, 189, 248, 0.08) 0%, rgba(15, 23, 42, 0.8) 100%);
-      width: 100%; height: 100%; z-index: 5;
+    .presenting-floating-bar {
+      position: absolute; top: 16px; left: 50%; transform: translateX(-50%); z-index: 25;
+      background: rgba(15, 23, 42, 0.92); backdrop-filter: blur(8px); border: 1px solid #0284c7;
+      padding: 8px 20px; border-radius: 100px; display: flex; align-items: center; gap: 16px;
+      box-shadow: 0 4px 20px rgba(2, 132, 199, 0.3);
     }
-    .presenting-icon {
-      font-size: 52px; margin-bottom: 16px; animation: pulseIcon 2s infinite ease-in-out;
+    .presenting-bar-info { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #38bdf8; }
+    .presenting-pulse { font-size: 16px; animation: pulseIcon 1.5s infinite; }
+    @keyframes pulseIcon { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.15); } }
+
+    .screen-preview-tile {
+      position: absolute; bottom: 20px; left: 20px; width: 240px; height: 150px;
+      border: 2px solid #0284c7; box-shadow: 0 8px 24px rgba(0,0,0,0.6); z-index: 10; border-radius: 12px; overflow: hidden;
     }
-    @keyframes pulseIcon { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
-    .presenting-banner h3 { margin: 0 0 8px 0; font-size: 20px; font-weight: 700; color: #f8fafc; }
-    .presenting-banner p { margin: 0; font-size: 14px; color: #94a3b8; max-width: 420px; }
 
     .avatar-placeholder {
       display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
@@ -443,9 +498,11 @@ export class LiveMeetingRoomComponent implements OnInit, OnDestroy {
 
   @ViewChild('localVideo') localVideoRef!: ElementRef<HTMLVideoElement>;
   @ViewChild('remoteVideo') remoteVideoRef!: ElementRef<HTMLVideoElement>;
+  @ViewChild('screenPreviewVideo') screenPreviewRef!: ElementRef<HTMLVideoElement>;
 
   localStream: MediaStream | null = null;
   remoteStream: MediaStream | null = null;
+  screenStream: MediaStream | null = null;
   hasRemoteStream = false;
 
   peerConnection: RTCPeerConnection | null = null;
@@ -469,6 +526,8 @@ export class LiveMeetingRoomComponent implements OnInit, OnDestroy {
   timerInterval: any = null;
 
   // ── PROCTORING & ANTI-CHEAT ──
+  isFullscreen = false;
+  dismissedFullscreenPrompt = false;
   isBlocked = false;
   candidateViolations = 0;
   maxViolations = 3;
@@ -477,6 +536,8 @@ export class LiveMeetingRoomComponent implements OnInit, OnDestroy {
   warningTimeout: any = null;
 
   decisionLoading = false;
+
+  candidateNotes = '';
 
   scorecard = {
     techScore: 8,
@@ -510,22 +571,71 @@ export class LiveMeetingRoomComponent implements OnInit, OnDestroy {
     this.removeProctoringListeners();
   }
 
-  // ── TAB SWITCH PROCTORING CONTROLS (3 WARNINGS) ──
+  // ── FULLSCREEN & TAB SWITCH PROCTORING CONTROLS ──
+  enterFullscreen() {
+    try {
+      const elem = document.documentElement as any;
+      if (elem.requestFullscreen) {
+        elem.requestFullscreen().catch(() => {});
+      } else if (elem.webkitRequestFullscreen) {
+        elem.webkitRequestFullscreen();
+      } else if (elem.msRequestFullscreen) {
+        elem.msRequestFullscreen();
+      }
+    } catch (e) {
+      console.warn('Fullscreen request error:', e);
+    }
+    this.isFullscreen = true;
+    this.dismissedFullscreenPrompt = true;
+  }
+
+  dismissFullscreenPrompt() {
+    this.dismissedFullscreenPrompt = true;
+    this.isFullscreen = true;
+  }
+
   initProctoringListeners() {
     if (!this.isRecruiter) {
       document.addEventListener('visibilitychange', this.onVisibilityChange);
+      document.addEventListener('fullscreenchange', this.onFullscreenChange);
+      document.addEventListener('webkitfullscreenchange', this.onFullscreenChange);
+      document.addEventListener('mozfullscreenchange', this.onFullscreenChange);
+      document.addEventListener('MSFullscreenChange', this.onFullscreenChange);
+
+      // Check initial state
+      this.isFullscreen = !!(document.fullscreenElement || (document as any).webkitFullscreenElement);
     }
   }
 
   removeProctoringListeners() {
     document.removeEventListener('visibilitychange', this.onVisibilityChange);
+    document.removeEventListener('fullscreenchange', this.onFullscreenChange);
+    document.removeEventListener('webkitfullscreenchange', this.onFullscreenChange);
+    document.removeEventListener('mozfullscreenchange', this.onFullscreenChange);
+    document.removeEventListener('MSFullscreenChange', this.onFullscreenChange);
   }
 
+  onFullscreenChange = () => {
+    if (this.isRecruiter) return;
+    const isFull = !!(document.fullscreenElement || (document as any).webkitFullscreenElement || (document as any).mozFullScreenElement);
+    if (isFull) {
+      this.isFullscreen = true;
+    } else if (this.dismissedFullscreenPrompt) {
+      // In split screen demo mode, keep room visible
+      this.isFullscreen = true;
+    } else {
+      this.isFullscreen = false;
+    }
+  };
+
   onVisibilityChange = () => {
-    // Only trigger if candidate switches tab, not already blocked, and not actively in screen share selection
     if (!this.isRecruiter && document.hidden && !this.isBlocked && !this.isScreenSharing) {
       this.recordCandidateViolation('Switched to another browser tab');
     }
+  };
+
+  onWindowBlur = () => {
+    // Window blur is ignored to support local split-screen testing (Candidate & Recruiter side-by-side)
   };
 
   recordCandidateViolation(reason: string) {
@@ -759,6 +869,7 @@ export class LiveMeetingRoomComponent implements OnInit, OnDestroy {
       this.isBlocked = false;
       this.candidateViolations = 0;
       this.candidateWarningMsg = 'Recruiter has unblocked your session. Please stay focused on the interview!';
+      this.enterFullscreen();
       setTimeout(() => this.candidateWarningMsg = '', 5000);
     }
   }
@@ -780,11 +891,11 @@ export class LiveMeetingRoomComponent implements OnInit, OnDestroy {
   async toggleScreenShare() {
     if (!this.isScreenSharing) {
       try {
-        const screenStream = await navigator.mediaDevices.getDisplayMedia({
+        this.screenStream = await navigator.mediaDevices.getDisplayMedia({
           video: true,
           audio: false
         });
-        const screenTrack = screenStream.getVideoTracks()[0];
+        const screenTrack = this.screenStream.getVideoTracks()[0];
 
         if (this.peerConnection) {
           const sender = this.peerConnection.getSenders().find(s => s.track?.kind === 'video');
@@ -798,6 +909,13 @@ export class LiveMeetingRoomComponent implements OnInit, OnDestroy {
         };
 
         this.isScreenSharing = true;
+
+        setTimeout(() => {
+          if (this.screenPreviewRef && this.screenPreviewRef.nativeElement && this.screenStream) {
+            this.screenPreviewRef.nativeElement.srcObject = this.screenStream;
+            this.screenPreviewRef.nativeElement.play().catch(() => {});
+          }
+        }, 100);
 
         this.api.sendSignal(this.roomKey, {
           type: 'SCREEN_START',
@@ -814,13 +932,21 @@ export class LiveMeetingRoomComponent implements OnInit, OnDestroy {
 
   stopScreenSharing() {
     this.isScreenSharing = false;
+
+    if (this.screenStream) {
+      this.screenStream.getTracks().forEach(t => t.stop());
+      this.screenStream = null;
+    }
+
     if (this.localStream) {
       const originalVideo = this.localStream.getVideoTracks()[0];
       const sender = this.peerConnection?.getSenders().find(s => s.track?.kind === 'video');
       if (sender && originalVideo) {
         sender.replaceTrack(originalVideo);
+        originalVideo.enabled = this.isCameraOn;
       }
     }
+
     this.api.sendSignal(this.roomKey, {
       type: 'SCREEN_STOP',
       senderId: this.clientId
@@ -929,6 +1055,10 @@ export class LiveMeetingRoomComponent implements OnInit, OnDestroy {
   cleanupMeeting() {
     if (this.timerInterval) clearInterval(this.timerInterval);
     if (this.signalPollingInterval) clearInterval(this.signalPollingInterval);
+    if (this.screenStream) {
+      this.screenStream.getTracks().forEach(t => t.stop());
+      this.screenStream = null;
+    }
     if (this.peerConnection) {
       this.peerConnection.close();
       this.peerConnection = null;

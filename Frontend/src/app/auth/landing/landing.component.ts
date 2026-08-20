@@ -4,7 +4,7 @@ import { Component } from '@angular/core';
   selector: 'app-landing',
   template: `
     <div class="landing">
-      <!-- Hero -->
+      <!-- Top Navigation -->
       <nav class="land-nav">
         <div class="nav-brand">
           <span class="brand-icon">⬡</span>
@@ -16,21 +16,20 @@ import { Component } from '@angular/core';
         </div>
       </nav>
 
+      <!-- Hero Section -->
       <section class="hero">
         <div class="hero-grid-bg"></div>
         <div class="hero-glow"></div>
         <div class="hero-content fade-in">
           <div class="hero-pill">
-            <span class="dot"></span> AI-Powered Recruitment Platform
+            <span class="dot"></span> Complete 4-Round AI Recruitment & Proctoring Platform
           </div>
           <h1 class="hero-title">
             Hire Smarter.<br>
             <span class="gradient-text">Not Harder.</span>
           </h1>
           <p class="hero-sub">
-            SmartHireAI automates ATS screening, MCQ assessment rounds,
-            and candidate tracking — powered by Gemini AI. Find the right
-            talent, faster.
+            SmartHireAI automates ATS resume screening, MCQ tests, live coding assessments, and HD WebRTC interviews — powered by Gemini AI. Find top talent faster with end-to-end anti-cheat proctoring.
           </p>
           <div class="hero-actions">
             <a routerLink="/register" class="btn btn-primary btn-lg">
@@ -40,45 +39,86 @@ import { Component } from '@angular/core';
               Browse Jobs
             </a>
           </div>
+
+          <!-- Hero Highlights / Stats Bar -->
           <div class="hero-stats">
             <div class="h-stat">
-              <span class="h-val">AI</span>
-              <span class="h-lbl">ATS Scoring</span>
+              <span class="h-val">Round 1</span>
+              <span class="h-lbl">AI Resume ATS</span>
             </div>
             <div class="h-divider"></div>
             <div class="h-stat">
-              <span class="h-val">MCQ</span>
-              <span class="h-lbl">Auto Assessments</span>
+              <span class="h-val">Round 2</span>
+              <span class="h-lbl">MCQ Tests</span>
             </div>
             <div class="h-divider"></div>
             <div class="h-stat">
-              <span class="h-val">2x</span>
-              <span class="h-lbl">Faster Hiring</span>
+              <span class="h-val">Round 3</span>
+              <span class="h-lbl">Coding Assessment</span>
+            </div>
+            <div class="h-divider"></div>
+            <div class="h-stat">
+              <span class="h-val">Round 4</span>
+              <span class="h-lbl">Live HD Meeting</span>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- Features -->
+      <!-- Hiring Pipeline Workflow -->
+      <section class="pipeline-section">
+        <div class="section-label" style="justify-content:center;margin-bottom:12px">End-To-End Recruitment</div>
+        <h2 class="pipeline-title">Automated 4-Round Hiring Funnel</h2>
+        <div class="pipeline-steps">
+          <div class="step-card">
+            <div class="step-num">01</div>
+            <h3>ATS Resume Screening</h3>
+            <p>Gemini AI evaluates candidate resumes against job descriptions, scoring match percentage instantly.</p>
+          </div>
+          <div class="step-arrow">➔</div>
+          <div class="step-card">
+            <div class="step-num">02</div>
+            <h3>MCQ Assessment</h3>
+            <p>Automated technical MCQ rounds with AI question generation and proctored tab monitoring.</p>
+          </div>
+          <div class="step-arrow">➔</div>
+          <div class="step-card">
+            <div class="step-num">03</div>
+            <h3>Live Coding Test</h3>
+            <p>Integrated code editor with automated test case execution, code scoring, and cheat logs.</p>
+          </div>
+          <div class="step-arrow">➔</div>
+          <div class="step-card">
+            <div class="step-num">04</div>
+            <h3>WebRTC Interview</h3>
+            <p>1-on-1 HD video call with bidirectional screen sharing, in-call chat, and recruiter scorecard.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Platform Features Grid -->
       <section class="features">
         <div class="section-label" style="justify-content:center;margin-bottom:12px">Platform Features</div>
-        <h2 class="features-title">Everything you need to hire right</h2>
+        <h2 class="features-title">Everything You Need To Source, Evaluate & Hire</h2>
         <div class="features-grid">
           <div class="feature-card" *ngFor="let f of features">
-            <div class="feature-icon">{{ f.icon }}</div>
+            <div class="feature-header">
+              <div class="feature-icon">{{ f.icon }}</div>
+              <span class="badge-tag" *ngIf="f.tag">{{ f.tag }}</span>
+            </div>
             <h4>{{ f.title }}</h4>
             <p>{{ f.desc }}</p>
           </div>
         </div>
       </section>
 
-      <!-- CTA -->
+      <!-- CTA Section -->
       <section class="cta-section">
         <div class="cta-card">
-          <h2>Ready to transform your hiring?</h2>
-          <p>Join companies using SmartHireAI for smarter recruitment</p>
+          <h2>Ready to transform your hiring process?</h2>
+          <p>Experience seamless AI screening, proctored coding assessments, and live interviews on SmartHireAI.</p>
           <div style="display:flex;gap:12px;justify-content:center;margin-top:28px">
-            <a routerLink="/register" class="btn btn-primary btn-lg">Create Account</a>
+            <a routerLink="/register" class="btn btn-primary btn-lg">Create Free Account</a>
             <a routerLink="/login" class="btn btn-outline btn-lg">Sign In</a>
           </div>
         </div>
@@ -86,7 +126,7 @@ import { Component } from '@angular/core';
     </div>
   `,
   styles: [`
-    .landing { min-height: 100vh; background: var(--bg-base); }
+    .landing { min-height: 100vh; background: var(--bg-base); color: var(--text-primary); }
 
     .land-nav {
       display: flex; align-items: center; justify-content: space-between;
@@ -120,12 +160,12 @@ import { Component } from '@angular/core';
       pointer-events: none;
     }
     .hero-content {
-      position: relative; text-align: center; max-width: 760px;
+      position: relative; text-align: center; max-width: 820px;
     }
     .hero-pill {
       display: inline-flex; align-items: center; gap: 8px;
       background: var(--teal-glow); border: 1px solid rgba(0,229,195,0.25);
-      border-radius: 100px; padding: 6px 16px;
+      border-radius: 100px; padding: 6px 18px;
       font-size: 12px; font-weight: 600; color: var(--teal);
       letter-spacing: 0.04em; margin-bottom: 28px;
     }
@@ -147,14 +187,40 @@ import { Component } from '@angular/core';
     }
     .hero-sub {
       font-size: 1.1rem; color: var(--text-secondary);
-      max-width: 540px; margin: 0 auto 36px; line-height: 1.7;
+      max-width: 640px; margin: 0 auto 36px; line-height: 1.7;
     }
     .hero-actions { display: flex; gap: 14px; justify-content: center; margin-bottom: 56px; }
-    .hero-stats { display: flex; align-items: center; justify-content: center; gap: 32px; }
+    .hero-stats {
+      display: flex; align-items: center; justify-content: center; gap: 24px;
+      background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px);
+      border: 1px solid var(--border); padding: 18px 32px; border-radius: 100px;
+      max-width: max-content; margin: 0 auto;
+    }
     .h-stat { text-align: center; }
-    .h-val { font-family: var(--font-display); font-size: 1.6rem; font-weight: 800; color: var(--teal); display: block; }
-    .h-lbl { font-size: 12px; color: var(--text-muted); display: block; margin-top: 2px; }
-    .h-divider { width: 1px; height: 40px; background: var(--border); }
+    .h-val { font-family: var(--font-display); font-size: 1.3rem; font-weight: 800; color: var(--teal); display: block; }
+    .h-lbl { font-size: 11px; color: var(--text-muted); display: block; margin-top: 2px; }
+    .h-divider { width: 1px; height: 32px; background: var(--border); }
+
+    /* PIPELINE WORKFLOW */
+    .pipeline-section {
+      padding: 80px 40px; text-align: center; border-top: 1px solid var(--border);
+      background: rgba(15, 23, 42, 0.3);
+    }
+    .pipeline-title { font-size: 2.2rem; margin-bottom: 48px; }
+    .pipeline-steps {
+      display: flex; align-items: center; justify-content: center; gap: 16px;
+      max-width: 1200px; margin: 0 auto; flex-wrap: wrap;
+    }
+    .step-card {
+      flex: 1; min-width: 220px; max-width: 260px; background: var(--bg-card);
+      border: 1px solid var(--border); border-radius: var(--radius-md);
+      padding: 24px 20px; text-align: left; position: relative; transition: all 0.2s;
+    }
+    .step-card:hover { border-color: var(--teal); transform: translateY(-4px); }
+    .step-num { font-size: 28px; font-weight: 900; color: var(--teal); opacity: 0.8; margin-bottom: 8px; }
+    .step-card h3 { font-size: 1rem; margin-bottom: 8px; }
+    .step-card p { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+    .step-arrow { font-size: 20px; color: var(--teal); opacity: 0.6; }
 
     /* FEATURES */
     .features {
@@ -165,8 +231,8 @@ import { Component } from '@angular/core';
     .features-title { font-size: 2.2rem; margin-bottom: 52px; }
     .features-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 20px; max-width: 1100px; margin: 0 auto; text-align: left;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px; max-width: 1200px; margin: 0 auto; text-align: left;
     }
     .feature-card {
       background: var(--bg-card);
@@ -174,9 +240,14 @@ import { Component } from '@angular/core';
       border-radius: var(--radius-md);
       padding: 28px; transition: var(--transition);
     }
-    .feature-card:hover { border-color: rgba(0,229,195,0.25); transform: translateY(-2px); }
-    .feature-icon { font-size: 28px; margin-bottom: 14px; }
-    .feature-card h4 { font-size: 1rem; margin-bottom: 8px; }
+    .feature-card:hover { border-color: rgba(0,229,195,0.35); transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+    .feature-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .feature-icon { font-size: 32px; }
+    .badge-tag {
+      background: rgba(0,229,195,0.12); color: var(--teal); border: 1px solid rgba(0,229,195,0.3);
+      font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 100px; text-transform: uppercase;
+    }
+    .feature-card h4 { font-size: 1.1rem; margin-bottom: 10px; font-weight: 700; }
     .feature-card p { font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
 
     /* CTA */
@@ -186,7 +257,7 @@ import { Component } from '@angular/core';
       border: 1px solid rgba(0,229,195,0.2);
       border-radius: var(--radius-xl);
       padding: 64px 40px; text-align: center;
-      max-width: 700px; margin: 0 auto;
+      max-width: 760px; margin: 0 auto;
       box-shadow: var(--shadow-glow);
     }
     .cta-card h2 { font-size: 2.2rem; margin-bottom: 12px; }
@@ -195,11 +266,55 @@ import { Component } from '@angular/core';
 })
 export class LandingComponent {
   features = [
-    { icon: '🤖', title: 'AI Resume Scoring', desc: 'Gemini AI parses resumes and scores them against job descriptions using advanced NLP.' },
-    { icon: '📋', title: 'MCQ Assessments', desc: 'Auto-generate or manually create MCQ tests. Release to shortlisted candidates instantly.' },
-    { icon: '🎯', title: 'ATS Pipeline', desc: 'Automated Applicant Tracking System with multi-round screening and real-time status.' },
-    { icon: '👥', title: 'Dual Role System', desc: 'Separate interfaces for Recruiters and Applicants with role-based access control.' },
-    { icon: '📧', title: 'Email Notifications', desc: 'Automated emails for application status, MCQ invites, and password resets.' },
-    { icon: '🔍', title: 'Smart Job Search', desc: 'Filter jobs by keyword and location. Apply in one click with your saved profile.' },
+    {
+      icon: '🤖',
+      tag: 'Round 1',
+      title: 'AI Resume & ATS Screening',
+      desc: 'Gemini AI automatically parses candidate resumes, matching skills & experience against job descriptions with real-time percentage scoring.'
+    },
+    {
+      icon: '📝',
+      tag: 'Round 2',
+      tagType: 'round',
+      title: 'Automated MCQ Assessments',
+      desc: 'Generate role-specific MCQ tests dynamically or curate custom question banks with instant automated grading and time limits.'
+    },
+    {
+      icon: '💻',
+      tag: 'Round 3',
+      title: 'Live Coding Assessment Environment',
+      desc: 'Integrated code editor supporting multi-language programming, automated test case execution, submission evaluation, and execution logs.'
+    },
+    {
+      icon: '🎥',
+      tag: 'Round 4',
+      title: 'HD WebRTC 1-on-1 Interview Meeting Room',
+      desc: 'Real-time video/audio calling with bidirectional screen sharing, live candidate-recruiter chat, and dynamic evaluation scorecards.'
+    },
+    {
+      icon: '🛡️',
+      tag: 'Proctoring',
+      title: 'AI Anti-Cheat & Proctoring Engine',
+      desc: 'Continuous anti-cheat monitoring across MCQ, Coding, and Meeting rounds with tab-switch detection, violation counters, and instant recruiter sirens.'
+    },
+    {
+      icon: '📊',
+      tag: 'ATS Pipeline',
+      title: 'Candidate Tracking & One-Click Hiring',
+      desc: 'Kanban & list views for managing multi-round candidate progress. Recruiters can hire or reject applicants with 1-click offer generation.'
+    },
+    {
+      icon: '👥',
+      tag: 'Role Management',
+      title: 'Dual Recruiter & Applicant Dashboards',
+      desc: 'Dedicated interfaces tailored for recruiters to post jobs & review applicants, and job seekers to track applications and take tests.'
+    },
+    {
+      icon: '📧',
+      tag: 'Automated Mail',
+      title: 'Instant Email & Status Notifications',
+      desc: 'Automated system emails for round advancement, test invites, meeting room credentials, password reset, and formal offer letters.'
+    }
   ];
 }
+

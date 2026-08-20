@@ -21,4 +21,5 @@ public class InterviewMeeting {
     private String slotStartTime;
     private String slotEndTime;
     private String interviewStatus;
+    private boolean expired;
 }

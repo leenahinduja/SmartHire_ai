@@ -260,6 +260,30 @@ public class InterviewService {
         }
     }
 
+    public void markInterviewCompleted(Long jobId, Long applicantId) {
+        interviewRepository.updateRound4Status(jobId, applicantId, "COMPLETED");
+
+        User user = authRepository.findById(applicantId);
+        String jobTitle = (jobsPostingRepository.getJobById(jobId) != null)
+                ? jobsPostingRepository.getJobById(jobId).getTitle()
+                : "Open Position";
+
+        if (user != null) {
+            String subject = "Interview Completed – " + jobTitle;
+            String body = String.format("""
+                <div style="font-family: sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                    <h2>Hello %s,</h2>
+                    <p>Your Round 4 interview for the position of <b>%s</b> has been completed.</p>
+                    <p>Your interview meeting link is now closed and expired. Our hiring team will review your evaluation and update your application status shortly.</p>
+                    <br>
+                    <p>Best Regards,<br><b>SmartHire AI Recruitment Team</b></p>
+                </div>
+                """, user.getName(), jobTitle);
+
+            emailService.sendNotificationEmail(user.getEmail(), subject, body);
+        }
+    }
+
     public byte[] generateRound4ExcelReport(Long jobId) {
         java.util.List<java.util.Map<String, Object>> applicants = applicationRepository.getByJob(jobId);
 

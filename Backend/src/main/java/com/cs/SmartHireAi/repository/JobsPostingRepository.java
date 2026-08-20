@@ -28,7 +28,8 @@ public class JobsPostingRepository {
         );
     }
     public List<Job> getAllJobs() {
-        return jdbcTemplate.query("SELECT * FROM jobs",(rs, rowNum) -> {
+        String sql = "SELECT j.*, (SELECT COUNT(*) FROM applications a WHERE a.job_id = j.id) as applicant_count FROM jobs j";
+        return jdbcTemplate.query(sql, (rs, rowNum) -> {
             Job job = new Job();
             job.setId(rs.getLong("id"));
             job.setRecruiterId(rs.getLong("recruiter_id"));
@@ -38,14 +39,22 @@ public class JobsPostingRepository {
             job.setLocation(rs.getString("location"));
             job.setSalaryRange(rs.getString("salary_range"));
             job.setJobType(rs.getString("job_type"));
-            job.setDeadline(rs.getDate("deadline").toLocalDate());
+            if (rs.getDate("deadline") != null) {
+                job.setDeadline(rs.getDate("deadline").toLocalDate());
+            }
+            try {
+                job.setApplicantCount(rs.getInt("applicant_count"));
+            } catch (Exception e) {
+                job.setApplicantCount(0);
+            }
             return job;
         });
     }
     // GET JOB BY ID
     public Job getJobById(Long id) {
+        String sql = "SELECT j.*, (SELECT COUNT(*) FROM applications a WHERE a.job_id = j.id) as applicant_count FROM jobs j WHERE j.id = ?";
         return jdbcTemplate.queryForObject(
-                "SELECT * FROM jobs WHERE id = ?",
+                sql,
                 (rs, rowNum) -> {
                     Job job = new Job();
                     job.setId(rs.getLong("id"));
@@ -56,7 +65,14 @@ public class JobsPostingRepository {
                     job.setLocation(rs.getString("location"));
                     job.setSalaryRange(rs.getString("salary_range"));
                     job.setJobType(rs.getString("job_type"));
-                    job.setDeadline(rs.getDate("deadline").toLocalDate());
+                    if (rs.getDate("deadline") != null) {
+                        job.setDeadline(rs.getDate("deadline").toLocalDate());
+                    }
+                    try {
+                        job.setApplicantCount(rs.getInt("applicant_count"));
+                    } catch (Exception e) {
+                        job.setApplicantCount(0);
+                    }
                     return job;
                 },
                 id

@@ -17,4 +17,5 @@ public class Job {
     private String jobType;
     private LocalDate deadline;
     private LocalDateTime createdAt;
+    private Integer applicantCount;
 }

@@ -65,18 +65,18 @@ public class JobPostingService {
     }
     public List<Job> searchJobs(String keyword, String location) {
 
-        String sql = "SELECT * FROM jobs WHERE active_yn = 1";
+        String sql = "SELECT j.*, (SELECT COUNT(*) FROM applications a WHERE a.job_id = j.id) as applicant_count FROM jobs j WHERE j.active_yn = 1";
         List<Object> params = new ArrayList<>();
 
         if (keyword != null && !keyword.isEmpty()) {
-            sql += " AND (LOWER(title) LIKE LOWER(?) OR LOWER(required_skills) LIKE LOWER(?) OR LOWER(description) LIKE LOWER(?))";
+            sql += " AND (LOWER(j.title) LIKE LOWER(?) OR LOWER(j.required_skills) LIKE LOWER(?) OR LOWER(j.description) LIKE LOWER(?))";
             params.add("%" + keyword + "%");
             params.add("%" + keyword + "%");
             params.add("%" + keyword + "%");
         }
 
         if (location != null && !location.isEmpty()) {
-            sql += " AND LOWER(location) LIKE LOWER(?)";
+            sql += " AND LOWER(j.location) LIKE LOWER(?)";
             params.add("%" + location + "%");
         }
 
@@ -90,7 +90,14 @@ public class JobPostingService {
             job.setLocation(rs.getString("location"));
             job.setSalaryRange(rs.getString("salary_range"));
             job.setJobType(rs.getString("job_type"));
-            job.setDeadline(rs.getDate("deadline").toLocalDate());
+            if (rs.getDate("deadline") != null) {
+                job.setDeadline(rs.getDate("deadline").toLocalDate());
+            }
+            try {
+                job.setApplicantCount(rs.getInt("applicant_count"));
+            } catch (Exception e) {
+                job.setApplicantCount(0);
+            }
             return job;
         }, params.toArray());
     }

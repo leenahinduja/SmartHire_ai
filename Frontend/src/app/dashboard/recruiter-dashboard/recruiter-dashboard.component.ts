@@ -69,11 +69,11 @@ import { Router } from '@angular/router';
               <span class="tag" *ngFor="let s of (job.requiredSkills || '').split(',').slice(0,3)">{{ s.trim() }}</span>
             </div>
             <div class="job-card-footer">
-              <div class="applicant-count" (click)="viewApplicants(job.id)">
+              <div class="applicant-count" (click)="viewApplicants(job.id)" title="View applicants pipeline">
                 <span class="count-badge">{{ job.applicantCount || 0 }}</span>
-                Applicants
+                <span class="count-text">Applicants</span>
               </div>
-              <div class="job-actions" style="display:flex;gap:6px;flex-wrap:wrap">
+              <div class="job-actions">
                 <button class="btn btn-ghost btn-sm" (click)="viewApplicants(job.id)">Pipeline</button>
                 <button class="btn btn-outline btn-sm" (click)="manageMcq(job.id)">MCQ</button>
                 <button class="btn btn-outline btn-sm" style="color:#38bdf8;border-color:#38bdf8" (click)="manageCoding(job.id)">Coding</button>
@@ -112,21 +112,24 @@ import { Router } from '@angular/router';
     .job-desc { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
 
     .job-card-footer {
-      display: flex; align-items: center; justify-content: space-between;
-      padding-top: 14px; border-top: 1px solid var(--border); margin-top: 4px;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding-top: 14px; border-top: 1px solid var(--border); margin-top: 12px;
+      flex-wrap: wrap;
     }
     .applicant-count {
       display: flex; align-items: center; gap: 8px;
-      font-size: 13px; color: var(--text-secondary); cursor: pointer;
+      font-size: 13px; font-weight: 600; color: var(--text-primary); cursor: pointer;
+      flex-shrink: 0;
     }
-    .applicant-count:hover { color: var(--text-primary); }
+    .applicant-count:hover { color: var(--teal); }
     .count-badge {
       background: var(--teal-glow); color: var(--teal);
-      border: 1px solid rgba(0,229,195,0.25);
+      border: 1px solid rgba(0,229,195,0.4);
       border-radius: 100px; padding: 2px 10px;
-      font-size: 12px; font-weight: 700;
+      font-size: 12px; font-weight: 800; min-width: 26px; text-align: center;
     }
-    .job-actions { display: flex; gap: 8px; }
+    .count-text { font-weight: 600; }
+    .job-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
     @media(max-width:900px) {
       .stats-row { grid-template-columns: repeat(2,1fr); }
       .dash-header { flex-direction: column; gap: 16px; }
@@ -144,11 +147,26 @@ export class RecruiterDashboardComponent implements OnInit {
     this.api.getAllJobs().subscribe({
       next: (d) => {
         this.jobs = d || [];
-        this.totalApplicants = this.jobs.reduce((acc, j) => acc + (j.applicantCount || 0), 0);
+        this.calculateTotalApplicants();
         this.loading = false;
+
+        // Fetch exact applicants per job to display genuine real figures
+        this.jobs.forEach(job => {
+          this.api.getApplicantsForJob(job.id).subscribe({
+            next: (applicants) => {
+              job.applicantCount = applicants ? applicants.length : 0;
+              this.calculateTotalApplicants();
+            },
+            error: () => {}
+          });
+        });
       },
       error: () => this.loading = false
     });
+  }
+
+  calculateTotalApplicants() {
+    this.totalApplicants = this.jobs.reduce((acc, j) => acc + (j.applicantCount || 0), 0);
   }
 
   viewApplicants(jobId: number) { this.router.navigate(['/recruiter/applicants', jobId]); }

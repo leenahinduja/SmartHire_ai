@@ -72,6 +72,13 @@ public class InterviewController {
         return ResponseEntity.ok(Map.of("message", "Candidate rejected in Interview round."));
     }
 
+    @PostMapping("/complete")
+    @PreAuthorize("hasRole('RECRUITER')")
+    public ResponseEntity<?> completeInterview(@RequestBody RoundDecisionRequest request) {
+        interviewService.markInterviewCompleted(request.getJobId(), request.getApplicantId());
+        return ResponseEntity.ok(Map.of("message", "Interview marked as completed and link has expired."));
+    }
+
     @GetMapping("/export-excel/{jobId}")
     @PreAuthorize("hasRole('RECRUITER')")
     public ResponseEntity<byte[]> exportExcel(@PathVariable Long jobId) {

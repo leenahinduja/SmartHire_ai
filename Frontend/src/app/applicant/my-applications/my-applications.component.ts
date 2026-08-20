@@ -102,7 +102,7 @@ import { Router } from '@angular/router';
             </div>
 
             <!-- 1. LIVE URGENT INTERVIEW CALLED (2 MIN WINDOW) -->
-            <div *ngIf="app.round3_status === 'SELECTED' && app.round4_status === 'IN_INTERVIEW' && app.meeting_link" 
+            <div *ngIf="app.round3_status === 'SELECTED' && app.round4_status === 'IN_INTERVIEW' && app.meeting_link && app.round4_status !== 'COMPLETED' && app.round4_status !== 'SELECTED' && app.round4_status !== 'REJECTED'" 
                  style="margin-bottom: 16px; padding: 18px 20px; background: rgba(239, 68, 68, 0.15); border: 2px solid #ef4444; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
               <div>
                 <div style="font-weight: 700; color: #f87171; font-size: 15px; display: flex; align-items: center; gap: 6px;">
@@ -119,7 +119,7 @@ import { Router } from '@angular/router';
             </div>
 
             <!-- 2. TIME SLOT ANNOUNCED (AWAITING TURN) -->
-            <div *ngIf="app.round3_status === 'SELECTED' && app.round4_status === 'SLOT_SCHEDULED'" 
+            <div *ngIf="app.round3_status === 'SELECTED' && app.round4_status === 'SLOT_SCHEDULED' && app.round4_status !== 'COMPLETED' && app.round4_status !== 'SELECTED' && app.round4_status !== 'REJECTED'" 
                  style="margin-bottom: 16px; padding: 14px 18px; background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
               <div>
                 <div style="font-weight: 600; color: #a78bfa; font-size: 14px;">📅 Round 4 Interview Slot Confirmed</div>
@@ -132,8 +132,8 @@ import { Router } from '@angular/router';
               </span>
             </div>
 
-            <!-- 3. STANDARD SCHEDULED MEETING (IF ANY) -->
-            <div *ngIf="app.round3_status === 'SELECTED' && app.meeting_link && app.round4_status !== 'IN_INTERVIEW' && app.round4_status !== 'SLOT_SCHEDULED' && app.round4_status !== 'REJECTED' && app.round4_status !== 'SELECTED' && app.meeting_link !== 'AWAITING_CALL'" 
+            <!-- 3. STANDARD SCHEDULED MEETING (IF ACTIVE) -->
+            <div *ngIf="app.round3_status === 'SELECTED' && app.meeting_link && app.round4_status !== 'IN_INTERVIEW' && app.round4_status !== 'SLOT_SCHEDULED' && app.round4_status !== 'REJECTED' && app.round4_status !== 'SELECTED' && app.round4_status !== 'COMPLETED' && app.meeting_link !== 'AWAITING_CALL'" 
                  style="margin-bottom: 16px; padding: 14px 18px; background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
               <div>
                 <div style="font-weight: 600; color: #a78bfa; font-size: 14px;">📅 Live Interview Scheduled</div>
@@ -144,6 +144,20 @@ import { Router } from '@angular/router';
               <a [href]="app.meeting_link" target="_blank" class="btn btn-primary btn-sm" style="background: #8b5cf6; border-color: #8b5cf6; text-decoration: none;">
                 🎥 Join Meeting
               </a>
+            </div>
+
+            <!-- 4. INTERVIEW COMPLETED & LINK EXPIRED -->
+            <div *ngIf="app.round4_status === 'COMPLETED' || (app.meeting_link && (app.round4_status === 'SELECTED' || app.round4_status === 'REJECTED'))" 
+                 style="margin-bottom: 16px; padding: 14px 18px; background: rgba(100, 116, 139, 0.15); border: 1px solid rgba(100, 116, 139, 0.3); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+              <div>
+                <div style="font-weight: 600; color: #cbd5e1; font-size: 14px;">🔒 Interview Session Completed</div>
+                <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                  Your interview session has been completed and marked done. The meeting link is expired.
+                </div>
+              </div>
+              <span class="badge" style="background: rgba(100, 116, 139, 0.25); color: #cbd5e1; border: 1px solid #64748b; padding: 6px 12px;">
+                🔒 Link Expired
+              </span>
             </div>
 
             <div class="app-card-footer">
@@ -265,10 +279,10 @@ export class MyApplicationsComponent implements OnInit {
       next: (d) => { 
         console.log('Applications from backend:', d);
         this.applications = (d || []).map((app: any) => {
-          const r1 = app.round1_status || 'PENDING';
-          const r2 = app.round2_status || 'PENDING';
-          const r3 = app.round3_status || 'PENDING';
-          const r4 = app.round4_status || 'PENDING';
+          let r1 = app.round1_status || 'PENDING';
+          let r2 = app.round2_status || 'PENDING';
+          let r3 = app.round3_status || 'PENDING';
+          let r4 = app.round4_status || 'PENDING';
 
           let computedStatus = 'APPLIED';
           let currentStageText = 'ATS Review';

@@ -35,7 +35,7 @@ import { Component } from '@angular/core';
             <a routerLink="/register" class="btn btn-primary btn-lg">
               Start Hiring Free
             </a>
-            <a routerLink="/jobs" class="btn btn-outline btn-lg">
+            <a routerLink="/login" class="btn btn-outline btn-lg">
               Browse Jobs
             </a>
           </div>

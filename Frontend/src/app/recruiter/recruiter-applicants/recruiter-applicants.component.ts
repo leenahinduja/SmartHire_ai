@@ -19,7 +19,10 @@ import { AuthService } from '../../shared/services/auth.service';
           <div class="pipeline-actions">
             <!-- Round 4 Interview Hub Options Button -->
             <button class="btn btn-primary" style="background: linear-gradient(135deg, #8b5cf6, #6366f1); border: none;" (click)="openRound4OptionsModal(null)">
-              🎙️ Round 4 (Interview Options)
+              🎙️ Round 4 Options
+            </button>
+            <button class="btn btn-primary" style="background: linear-gradient(135deg, #10b981, #059669); border: none; margin-left: 10px; font-weight: 700;" (click)="downloadSelectedCandidatesCsv()">
+              📊 Download CSV of Selected Candidates
             </button>
             <button class="btn btn-outline" style="margin-left: 10px;" (click)="manageMcq()">🎯 Manage MCQ</button>
             <button class="btn btn-outline" style="margin-left: 10px;" (click)="manageCoding()">💻 Manage Coding</button>
@@ -126,8 +129,8 @@ import { AuthService } from '../../shared/services/auth.service';
                   <input class="form-control" type="date" [(ngModel)]="slotForm.slotDate" />
                 </div>
                 <div class="form-group">
-                  <label class="form-label">Base Meeting Link (Google Meet / Zoom)</label>
-                  <input class="form-control" type="text" [(ngModel)]="slotForm.meetingLink" placeholder="https://meet.google.com/abc-defg-hij" />
+                  <label class="form-label">SmartHire AI In-Platform Meeting Link</label>
+                  <input class="form-control" type="text" [(ngModel)]="slotForm.meetingLink" placeholder="http://localhost:4200/meeting-room/..." />
                 </div>
               </div>
 
@@ -194,8 +197,8 @@ import { AuthService } from '../../shared/services/auth.service';
             </div>
 
             <div class="form-group" style="margin-bottom: 16px;">
-              <label class="form-label">Google Meet / Live Meeting Link</label>
-              <input class="form-control" type="text" [(ngModel)]="callMeetingLink" placeholder="https://meet.google.com/abc-defg-hij" />
+              <label class="form-label">SmartHire AI Live Meeting Room Link</label>
+              <input class="form-control" type="text" [(ngModel)]="callMeetingLink" placeholder="http://localhost:4200/meeting-room/..." />
             </div>
 
             <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 12px; margin-bottom: 20px;">
@@ -338,7 +341,7 @@ import { AuthService } from '../../shared/services/auth.service';
                     <span *ngIf="app.mcq_score !== null && app.mcq_score !== undefined" style="font-size: 12px; font-weight: 700; color: #10b981;">
                       Score: {{ app.mcq_score }}%
                     </span>
-                    <span *ngIf="app.mcq_score === null || app.mcq_score === undefined" style="font-size: 11px; color: var(--text-muted);">
+                    <span *ngIf="(app.mcq_score === null || app.mcq_score === undefined) && app.round2_status !== 'SELECTED'" style="font-size: 11px; color: var(--text-muted);">
                       Not Attempted
                     </span>
                   </div>
@@ -351,7 +354,7 @@ import { AuthService } from '../../shared/services/auth.service';
                     <span *ngIf="app.coding_score" style="font-size: 12px; font-weight: 700; color: #38bdf8;">
                       {{ app.coding_score }}
                     </span>
-                    <span *ngIf="!app.coding_score" style="font-size: 11px; color: var(--text-muted);">
+                    <span *ngIf="!app.coding_score && app.round3_status !== 'SELECTED'" style="font-size: 11px; color: var(--text-muted);">
                       Not Attempted
                     </span>
                   </div>
@@ -363,8 +366,11 @@ import { AuthService } from '../../shared/services/auth.service';
                     <span class="badge" [ngClass]="getBadgeClass(app.round4_status)">
                       {{ formatRound4Status(app.round4_status) }}
                     </span>
-                    <span *ngIf="app.meeting_link && app.meeting_link !== 'AWAITING_CALL'" style="font-size: 11px; color: #a78bfa;">
+                    <span *ngIf="app.meeting_link && app.meeting_link !== 'AWAITING_CALL' && app.round4_status !== 'SELECTED' && app.round4_status !== 'REJECTED' && app.round4_status !== 'COMPLETED'" style="font-size: 11px; color: #a78bfa;">
                       🔗 <a [href]="app.meeting_link" target="_blank" style="color: #a78bfa; text-decoration: underline;">Active Link</a>
+                    </span>
+                    <span *ngIf="app.round4_status === 'COMPLETED' || app.round4_status === 'SELECTED' || app.round4_status === 'REJECTED'" style="font-size: 11px; color: var(--text-muted);">
+                      🔒 Link Expired
                     </span>
                   </div>
                 </td>
@@ -398,34 +404,34 @@ import { AuthService } from '../../shared/services/auth.service';
                       🎙️ Pass R3 (To Interview)
                     </button>
 
-                    <!-- Round 4: Call Candidate Live (Send Realtime Link & 2-Min Alert) -->
+                    <!-- Round 4: Call Candidate Live (Only when interview not completed) -->
                     <button class="btn btn-primary btn-sm"
                       style="background: linear-gradient(135deg, #ef4444, #dc2626); border: none;"
-                      *ngIf="app.round3_status === 'SELECTED' && app.round4_status !== 'SELECTED' && app.round4_status !== 'REJECTED' && app.round4_status !== 'IN_INTERVIEW'"
+                      *ngIf="app.round3_status === 'SELECTED' && app.round4_status !== 'SELECTED' && app.round4_status !== 'REJECTED' && app.round4_status !== 'COMPLETED'"
                       (click)="openCallModal(app)">
-                      🚀 Call Candidate (Send Live Link)
+                      🚀 Call Candidate
                     </button>
 
-                    <!-- Round 4: Enter In-Platform Meeting Room -->
+                    <!-- Round 4: Enter Meeting Room (Only when interview active / not completed) -->
                     <button class="btn btn-primary btn-sm"
                       style="background: #0284c7; border-color: #0284c7;"
-                      *ngIf="app.round3_status === 'SELECTED' && (app.round4_status === 'IN_INTERVIEW' || app.meeting_link) && app.round4_status !== 'SELECTED' && app.round4_status !== 'REJECTED'"
+                      *ngIf="app.round3_status === 'SELECTED' && app.round4_status !== 'SELECTED' && app.round4_status !== 'REJECTED' && app.round4_status !== 'COMPLETED'"
                       (click)="enterMeetingRoom(app)">
-                      🎥 Enter Meeting Room
+                      🎥 Meeting Room
                     </button>
 
-                    <!-- Round 4: In Interview Live Indicator & Finish/Decide Button -->
+                    <!-- Round 4: Finish & Decide Button (Always available for completed & active interviews until final decision) -->
                     <button class="btn btn-primary btn-sm"
                       style="background: linear-gradient(135deg, #10b981, #059669); border: none;"
-                      *ngIf="app.round3_status === 'SELECTED' && (app.round4_status === 'IN_INTERVIEW' || app.meeting_link) && app.round4_status !== 'SELECTED' && app.round4_status !== 'REJECTED'"
+                      *ngIf="app.round3_status === 'SELECTED' && app.round4_status !== 'SELECTED' && app.round4_status !== 'REJECTED'"
                       (click)="openDecisionModal(app)">
                       ✅ Finish & Decide
                     </button>
 
-                    <!-- Round 4 Interview Options (Download/Email CSV/Slot Setup) -->
+                    <!-- Round 4 Interview Options (Only when interview active / not completed) -->
                     <button class="btn btn-outline btn-sm"
                       style="color: #a78bfa; border-color: #8b5cf6;"
-                      *ngIf="app.round3_status === 'SELECTED' && app.round4_status !== 'SELECTED' && app.round4_status !== 'REJECTED'"
+                      *ngIf="app.round3_status === 'SELECTED' && app.round4_status !== 'SELECTED' && app.round4_status !== 'REJECTED' && app.round4_status !== 'COMPLETED'"
                       (click)="openRound4OptionsModal(app)">
                       ⚙️ Options
                     </button>
@@ -572,7 +578,7 @@ export class RecruiterApplicantsComponent implements OnInit {
     slotDate: '',
     startTime: '14:00',
     endTime: '18:00',
-    meetingLink: 'https://meet.google.com/new'
+    meetingLink: ''
   };
 
   get selected() { return this.applicants.filter(a => a.round4_status === 'SELECTED').length; }
@@ -594,6 +600,7 @@ export class RecruiterApplicantsComponent implements OnInit {
   ngOnInit() {
     this.jobId = Number(this.route.snapshot.paramMap.get('jobId'));
     this.customRecipientEmail = this.auth.currentUser?.email || '';
+    this.slotForm.meetingLink = `${window.location.origin}/meeting-room/${this.jobId}`;
 
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -606,21 +613,26 @@ export class RecruiterApplicantsComponent implements OnInit {
     this.api.getApplicantsForJob(this.jobId).subscribe({
       next: (d) => { 
         this.applicants = (d || []).map((app: any) => {
+          let r1 = app.round1_status || 'PENDING';
+          let r2 = app.round2_status || 'PENDING';
+          let r3 = app.round3_status || 'PENDING';
+          let r4 = app.round4_status || 'PENDING';
+
           const mapped = {
             ...app,
             applicantId: app.applicant_id || app.applicantId || app.id,
             applicantName: app.name || app.applicantName || 'Unknown',
             email: app.email || '',
             appliedAt: app.created_at || app.appliedAt || app.applied_at || new Date().toISOString(),
-            round1_status: app.round1_status || 'PENDING',
-            round2_status: app.round2_status || 'PENDING',
-            round3_status: app.round3_status || 'PENDING',
-            round4_status: app.round4_status || 'PENDING',
+            round1_status: r1,
+            round2_status: r2,
+            round3_status: r3,
+            round4_status: r4,
             meeting_link: app.meeting_link || null,
             meeting_time: app.meeting_time || null,
             mcq_score: app.mcq_score !== undefined ? app.mcq_score : null,
             coding_score: app.coding_score || null,
-            status: app.round4_status === 'SELECTED' ? 'SELECTED' : (app.round1_status || 'APPLIED')
+            status: r4 === 'SELECTED' ? 'SELECTED' : (r1 || 'APPLIED')
           };
           return mapped;
         });
@@ -953,6 +965,27 @@ export class RecruiterApplicantsComponent implements OnInit {
     });
   }
 
+  downloadSelectedCandidatesCsv() {
+    const selected = this.applicants.filter(a => a.round4_status === 'SELECTED');
+    if (!selected || selected.length === 0) {
+      alert('No candidates have been selected/hired yet. Evaluate candidates and click "Finish & Decide" to hire candidates first.');
+      return;
+    }
+
+    let csv = 'Applicant ID,Candidate Name,Email Address,Applied Date,R1 ATS Status,R2 MCQ Score,R3 Coding Score,R4 Interview Status,Final Selection\n';
+    selected.forEach(a => {
+      csv += `"${a.applicantId}","${a.applicantName}","${a.email}","${this.formatDate(a.appliedAt)}","SELECTED","${a.mcq_score !== null && a.mcq_score !== undefined ? a.mcq_score + '%' : 'N/A'}","${a.coding_score || 'N/A'}","SELECTED","HIRED (SELECTED)"\n`;
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', `Selected_Candidates_Job_${this.jobId}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
   onResumeSelect(event: any) {
     this.atsResume = event.target.files[0] || null;
   }
@@ -977,7 +1010,8 @@ export class RecruiterApplicantsComponent implements OnInit {
       REJECTED: 'badge-red',
       PENDING: 'badge-teal',
       SLOT_SCHEDULED: 'badge-purple',
-      IN_INTERVIEW: 'badge-red'
+      IN_INTERVIEW: 'badge-red',
+      COMPLETED: 'badge-purple'
     };
     return m[s] || 'badge-teal';
   }
@@ -986,6 +1020,7 @@ export class RecruiterApplicantsComponent implements OnInit {
     if (!s || s === 'PENDING') return 'PENDING';
     if (s === 'SLOT_SCHEDULED') return '⏰ Slot Announced (Ready)';
     if (s === 'IN_INTERVIEW') return '🔴 Live in Interview';
+    if (s === 'COMPLETED') return '🔒 Interview Completed (Link Expired)';
     if (s === 'SELECTED') return '🏆 Hired';
     if (s === 'REJECTED') return '❌ Rejected';
     return s;

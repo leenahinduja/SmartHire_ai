@@ -104,23 +104,28 @@ import { AuthService } from '../../shared/services/auth.service';
               </div>
             </div>
 
-            <!-- Hiring Process -->
+            <!-- Hiring Process (All 4 Rounds) -->
             <div class="card" style="margin-top:16px">
-              <h4 style="margin-bottom:16px">Hiring Process</h4>
+              <h4 style="margin-bottom:16px">Hiring Process (4 Rounds)</h4>
               <div class="process-steps">
                 <div class="process-step">
                   <div class="step-num">1</div>
-                  <div><div class="step-title">ATS Screening</div><div class="step-sub">AI resume match</div></div>
+                  <div><div class="step-title">Round 1: ATS Screening</div><div class="step-sub">AI resume match & keyword score</div></div>
                 </div>
                 <div class="step-connector"></div>
                 <div class="process-step">
                   <div class="step-num">2</div>
-                  <div><div class="step-title">Round 1 Review</div><div class="step-sub">Recruiter shortlist</div></div>
+                  <div><div class="step-title">Round 2: MCQ Assessment</div><div class="step-sub">AI-powered technical quiz</div></div>
                 </div>
                 <div class="step-connector"></div>
                 <div class="process-step">
                   <div class="step-num">3</div>
-                  <div><div class="step-title">MCQ Assessment</div><div class="step-sub">AI-powered test</div></div>
+                  <div><div class="step-title">Round 3: Coding Sandbox</div><div class="step-sub">Interactive code & test cases</div></div>
+                </div>
+                <div class="step-connector"></div>
+                <div class="process-step">
+                  <div class="step-num">4</div>
+                  <div><div class="step-title">Round 4: WebRTC Live Interview</div><div class="step-sub">HD video call & anti-cheat proctoring</div></div>
                 </div>
               </div>
             </div>

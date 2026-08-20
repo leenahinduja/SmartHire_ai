@@ -18,17 +18,31 @@ import { AuthService } from '../../shared/services/auth.service';
         </div>
         <div class="auth-decorations">
           <div class="deco-card">
-            <div class="deco-icon">🎯</div>
+            <div class="deco-icon">🤖</div>
             <div>
-              <div class="deco-title">ATS Score: 92%</div>
-              <div class="deco-sub">Perfect match detected</div>
+              <div class="deco-title">Round 1: AI Resume ATS</div>
+              <div class="deco-sub">95% Match • Automated Skill Parsing</div>
             </div>
           </div>
-          <div class="deco-card" style="margin-left:32px;margin-top:12px">
-            <div class="deco-icon">✅</div>
+          <div class="deco-card" style="margin-left:24px;margin-top:10px">
+            <div class="deco-icon">📝</div>
             <div>
-              <div class="deco-title">Round 2 Unlocked</div>
-              <div class="deco-sub">MCQ test sent to candidate</div>
+              <div class="deco-title">Round 2: Proctored MCQ</div>
+              <div class="deco-sub">Instant AI Grading & Anti-Cheat</div>
+            </div>
+          </div>
+          <div class="deco-card" style="margin-left:48px;margin-top:10px">
+            <div class="deco-icon">💻</div>
+            <div>
+              <div class="deco-title">Round 3: Live Coding Sandbox</div>
+              <div class="deco-sub">Multi-Language IDE & Auto Test Cases</div>
+            </div>
+          </div>
+          <div class="deco-card" style="margin-left:24px;margin-top:10px">
+            <div class="deco-icon">🎥</div>
+            <div>
+              <div class="deco-title">Round 4: WebRTC HD Interview</div>
+              <div class="deco-sub">Live 1-on-1 Meeting & AI Scorecard</div>
             </div>
           </div>
         </div>
@@ -86,10 +100,13 @@ import { AuthService } from '../../shared/services/auth.service';
     .auth-tagline h2 { font-size: 2rem; line-height: 1.3; margin-bottom: 12px; }
     .auth-tagline p { color: var(--text-secondary); font-size: 1rem; }
     .deco-card {
-      display: flex; align-items: center; gap: 12px;
+      display: flex; align-items: center; gap: 14px;
       background: var(--bg-card); border: 1px solid var(--border);
       border-radius: var(--radius-md); padding: 14px 18px;
-      max-width: 260px;
+      max-width: 320px; transition: var(--transition);
+    }
+    .deco-card:hover {
+      border-color: var(--teal); transform: translateY(-2px);
     }
     .deco-icon { font-size: 20px; }
     .deco-title { font-size: 13px; font-weight: 600; }

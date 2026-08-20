@@ -89,8 +89,9 @@ interface ChatMessage {
             </div>
 
             <!-- Remote Participant Stream / Remote Screen -->
-            <video #remoteVideo autoplay playsinline class="video-stream" [class.hidden]="!hasRemoteStream"></video>
+            <video #remoteVideo autoplay playsinline class="video-stream" [class.hidden]="!hasRemoteStream || (!isRemoteCameraOn && !isRemoteScreenSharing)"></video>
             
+            <!-- Avatar Placeholder when Connecting -->
             <div class="avatar-placeholder" *ngIf="!hasRemoteStream">
               <div class="pulse-ring"></div>
               <div class="avatar-circle">
@@ -102,8 +103,24 @@ interface ChatMessage {
               </div>
             </div>
 
+            <!-- Avatar Placeholder when Remote Camera is OFF (Google Meet & Zoom Style) -->
+            <div class="avatar-placeholder remote-cam-off-ph" *ngIf="hasRemoteStream && !isRemoteCameraOn && !isRemoteScreenSharing">
+              <div class="avatar-circle">
+                {{ (isRecruiter ? 'Candidate' : 'Recruiter').charAt(0) }}
+              </div>
+              <h3 style="margin-top: 14px; font-size: 18px; color: #f8fafc; font-weight: 600;">
+                {{ isRecruiter ? 'Candidate' : 'Recruiter' }}
+              </h3>
+              <p style="font-size: 13px; color: #94a3b8; margin-top: 4px;">
+                <span>📷 Camera Off</span>
+                <span *ngIf="!isRemoteMicOn" style="margin-left: 8px; color: #f87171;">| 🔇 Muted</span>
+              </p>
+            </div>
+
             <div class="tile-tag" *ngIf="hasRemoteStream">
               <span>🟢 {{ isRemoteScreenSharing ? (isRecruiter ? 'Candidate (Presenting Screen)' : 'Recruiter (Presenting Screen)') : (isRecruiter ? 'Candidate (Live)' : 'Recruiter (Live)') }}</span>
+              <span *ngIf="!isRemoteCameraOn && !isRemoteScreenSharing" style="margin-left: 6px; color: #fca5a5;">(Camera Off)</span>
+              <span *ngIf="!isRemoteMicOn" style="margin-left: 6px; color: #f87171;">🔇</span>
             </div>
 
             <!-- Violation indicator tag on remote tile for Recruiter -->
@@ -187,12 +204,17 @@ interface ChatMessage {
               <textarea rows="4" [(ngModel)]="scorecard.notes" class="form-control" placeholder="Candidate's strengths, code explanations, areas of concern..."></textarea>
             </div>
 
-            <div class="scorecard-actions">
-              <button class="btn btn-primary" style="background:#10b981; border-color:#10b981; flex:1;" (click)="endAndHire()" [disabled]="decisionLoading">
-                🎉 Hire Candidate
-              </button>
-              <button class="btn btn-danger" style="flex:1;" (click)="endAndReject()" [disabled]="decisionLoading">
-                ✗ Reject Candidate
+            <div class="scorecard-actions" style="display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;gap:8px">
+                <button class="btn btn-primary" style="background:#10b981; border-color:#10b981; flex:1;" (click)="endAndHire()" [disabled]="decisionLoading">
+                  🎉 Hire Candidate
+                </button>
+                <button class="btn btn-danger" style="flex:1;" (click)="endAndReject()" [disabled]="decisionLoading">
+                  ✗ Reject Candidate
+                </button>
+              </div>
+              <button class="btn btn-outline" style="color:#a78bfa; border-color:#8b5cf6; width:100%" (click)="endAndMarkDone()" [disabled]="decisionLoading">
+                🔒 Mark Done & Expire Link
               </button>
             </div>
           </div>
@@ -265,8 +287,24 @@ interface ChatMessage {
         </div>
       </footer>
 
+      <!-- MEETING EXPIRED OVERLAY -->
+      <div class="fullscreen-blocker-overlay fade-in" *ngIf="isMeetingExpired">
+        <div class="blocker-card">
+          <div class="blocker-icon">🔒</div>
+          <h2>Interview Meeting Link Expired</h2>
+          <div style="margin-top: 12px;">
+            <p class="blocker-desc" style="color: #cbd5e1;">
+              This interview meeting session has been marked completed by the recruiter. The join link has expired.
+            </p>
+            <button class="btn btn-primary btn-md" style="background: #0284c7; border: none; padding: 10px 24px; border-radius: 8px; font-weight: 700; margin-top: 12px;" (click)="leaveMeeting()">
+              Return to Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- CANDIDATE FULLSCREEN MANDATE OVERLAY (WITH SPLIT-SCREEN DEMO OPTION) -->
-      <div class="fullscreen-blocker-overlay fade-in" *ngIf="!isRecruiter && !isFullscreen && !isBlocked && !dismissedFullscreenPrompt">
+      <div class="fullscreen-blocker-overlay fade-in" *ngIf="!isRecruiter && !isFullscreen && !isBlocked && !dismissedFullscreenPrompt && !isMeetingExpired">
         <div class="blocker-card">
           <div class="blocker-icon">🖥️</div>
           <h2>Fullscreen & Split-Screen Mode</h2>
@@ -289,7 +327,7 @@ interface ChatMessage {
       </div>
 
       <!-- CANDIDATE ANTI-CHEAT LOCK OVERLAY (BLOCKED AFTER MAX VIOLATIONS) -->
-      <div class="fullscreen-blocker-overlay fade-in" *ngIf="!isRecruiter && isBlocked">
+      <div class="fullscreen-blocker-overlay fade-in" *ngIf="!isRecruiter && isBlocked && !isMeetingExpired">
         <div class="blocker-card">
           <div class="blocker-icon">🚫</div>
           <h2>Interview Blocked - Anti-Cheat Violation</h2>
@@ -534,6 +572,10 @@ export class LiveMeetingRoomComponent implements OnInit, OnDestroy {
   latestViolationMsg = '';
   candidateWarningMsg = '';
   warningTimeout: any = null;
+  isMeetingExpired = false;
+
+  isRemoteCameraOn = true;
+  isRemoteMicOn = true;
 
   decisionLoading = false;
 
@@ -560,6 +602,28 @@ export class LiveMeetingRoomComponent implements OnInit, OnDestroy {
     this.applicantId = Number(this.route.snapshot.paramMap.get('applicantId'));
     this.roomKey = `${this.jobId}_${this.applicantId}`;
     this.clientId = 'client_' + Math.random().toString(36).substring(2, 9);
+
+    // Check if interview meeting link has expired or prerequisite round is pending
+    this.api.getInterviewMeeting(this.jobId).subscribe({
+      next: (meeting: any) => {
+        if (meeting && (meeting.expired || meeting.interviewStatus === 'EXPIRED' || meeting.interviewStatus === 'COMPLETED' || meeting.interviewStatus === 'SELECTED' || meeting.interviewStatus === 'REJECTED')) {
+          this.isMeetingExpired = true;
+        }
+      },
+      error: () => {}
+    });
+
+    if (!this.isRecruiter) {
+      this.api.getApplicantStatus(this.jobId).subscribe({
+        next: (statusMap: any) => {
+          if (statusMap && statusMap.round3_status !== 'SELECTED') {
+            alert('🔒 Prerequisite Required: You must complete and pass Round 3 (Coding Sandbox) before entering the Round 4 Live Interview.');
+            this.router.navigate(['/applicant/my-applications']);
+          }
+        },
+        error: () => {}
+      });
+    }
 
     this.startMeetingTimer();
     this.initWebRtcAndMedia();
@@ -594,6 +658,10 @@ export class LiveMeetingRoomComponent implements OnInit, OnDestroy {
     this.isFullscreen = true;
   }
 
+  faceCheckInterval: any = null;
+  multiPersonConsecCount = 0;
+  offscreenCanvas: HTMLCanvasElement | null = null;
+
   initProctoringListeners() {
     if (!this.isRecruiter) {
       document.addEventListener('visibilitychange', this.onVisibilityChange);
@@ -604,6 +672,9 @@ export class LiveMeetingRoomComponent implements OnInit, OnDestroy {
 
       // Check initial state
       this.isFullscreen = !!(document.fullscreenElement || (document as any).webkitFullscreenElement);
+
+      // Start multi-person camera frame detection
+      this.startMultiPersonDetector();
     }
   }
 
@@ -613,6 +684,91 @@ export class LiveMeetingRoomComponent implements OnInit, OnDestroy {
     document.removeEventListener('webkitfullscreenchange', this.onFullscreenChange);
     document.removeEventListener('mozfullscreenchange', this.onFullscreenChange);
     document.removeEventListener('MSFullscreenChange', this.onFullscreenChange);
+
+    this.cleanupMultiPersonDetector();
+  }
+
+  startMultiPersonDetector() {
+    if (this.faceCheckInterval) clearInterval(this.faceCheckInterval);
+    this.faceCheckInterval = setInterval(() => {
+      this.checkMultiPersonInFrame();
+    }, 3000);
+  }
+
+  cleanupMultiPersonDetector() {
+    if (this.faceCheckInterval) {
+      clearInterval(this.faceCheckInterval);
+      this.faceCheckInterval = null;
+    }
+  }
+
+  async checkMultiPersonInFrame() {
+    if (this.isRecruiter || this.isBlocked || !this.localVideoRef || !this.isCameraOn) return;
+    const video = this.localVideoRef.nativeElement;
+    if (!video || video.paused || video.ended || !video.videoWidth) return;
+
+    // 1. Native FaceDetector API if supported (Chrome/Edge)
+    if ('FaceDetector' in window) {
+      try {
+        const faceDetector = new (window as any).FaceDetector({ fastMode: true, maxFaces: 5 });
+        const faces = await faceDetector.detect(video);
+        if (faces && faces.length > 1) {
+          this.recordCandidateViolation(`Multiple people (${faces.length} faces) detected in camera frame`);
+          return;
+        }
+      } catch (e) {
+        // Fall back to spatial feature analyzer
+      }
+    }
+
+    // 2. Canvas Spatial Skin-Cluster Detector
+    try {
+      if (!this.offscreenCanvas) {
+        this.offscreenCanvas = document.createElement('canvas');
+        this.offscreenCanvas.width = 160;
+        this.offscreenCanvas.height = 120;
+      }
+
+      const ctx = this.offscreenCanvas.getContext('2d');
+      if (!ctx) return;
+
+      ctx.drawImage(video, 0, 0, 160, 120);
+      const imgData = ctx.getImageData(0, 0, 160, 120);
+      const pixels = imgData.data;
+
+      let leftSkinMass = 0;
+      let rightSkinMass = 0;
+      let centerSkinMass = 0;
+
+      for (let y = 15; y < 105; y += 3) {
+        for (let x = 10; x < 150; x += 3) {
+          const idx = (y * 160 + x) * 4;
+          const r = pixels[idx];
+          const g = pixels[idx + 1];
+          const b = pixels[idx + 2];
+
+          const isSkin = (r > 60 && g > 35 && b > 20 && r > g && r > b && (Math.max(r, g, b) - Math.min(r, g, b) > 15) && Math.abs(r - g) > 15);
+
+          if (isSkin) {
+            if (x < 65) leftSkinMass++;
+            else if (x > 95) rightSkinMass++;
+            else centerSkinMass++;
+          }
+        }
+      }
+
+      if (leftSkinMass > 80 && rightSkinMass > 80 && centerSkinMass < 30) {
+        this.multiPersonConsecCount++;
+        if (this.multiPersonConsecCount >= 2) {
+          this.multiPersonConsecCount = 0;
+          this.recordCandidateViolation('Multiple people / extra person detected in camera frame');
+        }
+      } else {
+        this.multiPersonConsecCount = Math.max(0, this.multiPersonConsecCount - 1);
+      }
+    } catch (err) {
+      console.warn('Multi-person detection error:', err);
+    }
   }
 
   onFullscreenChange = () => {
@@ -640,14 +796,14 @@ export class LiveMeetingRoomComponent implements OnInit, OnDestroy {
 
   recordCandidateViolation(reason: string) {
     this.candidateViolations++;
-    this.candidateWarningMsg = `⚠️ Warning ${this.candidateViolations}/${this.maxViolations}: ${reason}! Tab switching is not permitted during interview.`;
+    this.candidateWarningMsg = `⚠️ Warning ${this.candidateViolations}/${this.maxViolations}: ${reason}! Keep camera focused on single candidate.`;
 
     if (this.warningTimeout) clearTimeout(this.warningTimeout);
-    this.warningTimeout = setTimeout(() => this.candidateWarningMsg = '', 6000);
+    this.warningTimeout = setTimeout(() => this.candidateWarningMsg = '', 7000);
 
     if (this.candidateViolations >= this.maxViolations) {
       this.isBlocked = true;
-      this.candidateWarningMsg = `🚫 Limit exceeded (${this.maxViolations}/${this.maxViolations})! Session blocked.`;
+      this.candidateWarningMsg = `🚫 Limit exceeded (${this.maxViolations}/${this.maxViolations})! Session blocked for anti-cheat violations.`;
     }
 
     // Signal Recruiter immediately
@@ -696,11 +852,13 @@ export class LiveMeetingRoomComponent implements OnInit, OnDestroy {
     this.createPeerConnection();
     this.startSignalPolling();
 
-    // Announce Join
+    // Announce Join & initial camera/mic state
     this.api.sendSignal(this.roomKey, {
       type: 'JOIN',
       senderId: this.clientId,
-      role: this.isRecruiter ? 'RECRUITER' : 'APPLICANT'
+      role: this.isRecruiter ? 'RECRUITER' : 'APPLICANT',
+      isCameraOn: this.isCameraOn,
+      isMicOn: this.isMicOn
     }).subscribe();
   }
 
@@ -729,16 +887,12 @@ export class LiveMeetingRoomComponent implements OnInit, OnDestroy {
         if (!this.remoteStream) {
           this.remoteStream = new MediaStream();
         }
-        this.remoteStream.addTrack(event.track);
+        if (!this.remoteStream.getTracks().includes(event.track)) {
+          this.remoteStream.addTrack(event.track);
+        }
       }
       this.hasRemoteStream = true;
-
-      setTimeout(() => {
-        if (this.remoteVideoRef && this.remoteVideoRef.nativeElement && this.remoteStream) {
-          this.remoteVideoRef.nativeElement.srcObject = this.remoteStream;
-          this.remoteVideoRef.nativeElement.play().catch(() => {});
-        }
-      }, 50);
+      this.bindRemoteStreamToVideo();
     };
 
     this.peerConnection.onicecandidate = (event) => {
@@ -750,6 +904,17 @@ export class LiveMeetingRoomComponent implements OnInit, OnDestroy {
         }).subscribe();
       }
     };
+  }
+
+  bindRemoteStreamToVideo() {
+    setTimeout(() => {
+      if (this.remoteVideoRef && this.remoteVideoRef.nativeElement && this.remoteStream) {
+        const videoElem = this.remoteVideoRef.nativeElement;
+        videoElem.srcObject = null;
+        videoElem.srcObject = this.remoteStream;
+        videoElem.play().catch(e => console.warn('Autoplay handled:', e));
+      }
+    }, 100);
   }
 
   async sendOffer() {
@@ -795,7 +960,13 @@ export class LiveMeetingRoomComponent implements OnInit, OnDestroy {
   }
 
   async handleIncomingSignal(signal: any) {
-    if (signal.type === 'JOIN') {
+    if (signal.type === 'CAM_TOGGLE') {
+      this.isRemoteCameraOn = signal.isCameraOn;
+    } else if (signal.type === 'MIC_TOGGLE') {
+      this.isRemoteMicOn = signal.isMicOn;
+    } else if (signal.type === 'JOIN') {
+      if (signal.isCameraOn !== undefined) this.isRemoteCameraOn = signal.isCameraOn;
+      if (signal.isMicOn !== undefined) this.isRemoteMicOn = signal.isMicOn;
       if (this.isRecruiter) {
         this.sendOffer();
       }
@@ -818,6 +989,8 @@ export class LiveMeetingRoomComponent implements OnInit, OnDestroy {
           senderId: this.clientId,
           sdp: answer
         }).subscribe();
+
+        this.bindRemoteStreamToVideo();
       } catch (e) {
         console.warn('Error handling offer:', e);
       }
@@ -825,6 +998,7 @@ export class LiveMeetingRoomComponent implements OnInit, OnDestroy {
       try {
         if (this.peerConnection.signalingState === 'have-local-offer') {
           await this.peerConnection.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+          this.bindRemoteStreamToVideo();
         }
       } catch (e) {
         console.warn('Error handling answer:', e);
@@ -840,20 +1014,10 @@ export class LiveMeetingRoomComponent implements OnInit, OnDestroy {
     } else if (signal.type === 'SCREEN_START') {
       this.isRemoteScreenSharing = true;
       this.hasRemoteStream = true;
-      setTimeout(() => {
-        if (this.remoteVideoRef && this.remoteVideoRef.nativeElement && this.remoteStream) {
-          this.remoteVideoRef.nativeElement.srcObject = this.remoteStream;
-          this.remoteVideoRef.nativeElement.play().catch(() => {});
-        }
-      }, 100);
+      this.bindRemoteStreamToVideo();
     } else if (signal.type === 'SCREEN_STOP') {
       this.isRemoteScreenSharing = false;
-      setTimeout(() => {
-        if (this.remoteVideoRef && this.remoteVideoRef.nativeElement && this.remoteStream) {
-          this.remoteVideoRef.nativeElement.srcObject = this.remoteStream;
-          this.remoteVideoRef.nativeElement.play().catch(() => {});
-        }
-      }, 100);
+      this.bindRemoteStreamToVideo();
     } else if (signal.type === 'CHAT') {
       this.chatMessages.push({
         sender: signal.sender,
@@ -871,6 +1035,8 @@ export class LiveMeetingRoomComponent implements OnInit, OnDestroy {
       this.candidateWarningMsg = 'Recruiter has unblocked your session. Please stay focused on the interview!';
       this.enterFullscreen();
       setTimeout(() => this.candidateWarningMsg = '', 5000);
+    } else if (signal.type === 'INTERVIEW_COMPLETED') {
+      this.isMeetingExpired = true;
     }
   }
 
@@ -879,6 +1045,11 @@ export class LiveMeetingRoomComponent implements OnInit, OnDestroy {
     if (this.localStream) {
       this.localStream.getAudioTracks().forEach(t => t.enabled = this.isMicOn);
     }
+    this.api.sendSignal(this.roomKey, {
+      type: 'MIC_TOGGLE',
+      senderId: this.clientId,
+      isMicOn: this.isMicOn
+    }).subscribe();
   }
 
   toggleCamera() {
@@ -886,13 +1057,18 @@ export class LiveMeetingRoomComponent implements OnInit, OnDestroy {
     if (this.localStream) {
       this.localStream.getVideoTracks().forEach(t => t.enabled = this.isCameraOn);
     }
+    this.api.sendSignal(this.roomKey, {
+      type: 'CAM_TOGGLE',
+      senderId: this.clientId,
+      isCameraOn: this.isCameraOn
+    }).subscribe();
   }
 
   async toggleScreenShare() {
     if (!this.isScreenSharing) {
       try {
         this.screenStream = await navigator.mediaDevices.getDisplayMedia({
-          video: true,
+          video: { cursor: 'always' } as any,
           audio: false
         });
         const screenTrack = this.screenStream.getVideoTracks()[0];
@@ -900,7 +1076,7 @@ export class LiveMeetingRoomComponent implements OnInit, OnDestroy {
         if (this.peerConnection) {
           const sender = this.peerConnection.getSenders().find(s => s.track?.kind === 'video');
           if (sender) {
-            sender.replaceTrack(screenTrack);
+            await sender.replaceTrack(screenTrack);
           }
         }
 
@@ -917,6 +1093,8 @@ export class LiveMeetingRoomComponent implements OnInit, OnDestroy {
           }
         }, 100);
 
+        this.sendOffer();
+
         this.api.sendSignal(this.roomKey, {
           type: 'SCREEN_START',
           senderId: this.clientId
@@ -930,7 +1108,7 @@ export class LiveMeetingRoomComponent implements OnInit, OnDestroy {
     }
   }
 
-  stopScreenSharing() {
+  async stopScreenSharing() {
     this.isScreenSharing = false;
 
     if (this.screenStream) {
@@ -942,10 +1120,12 @@ export class LiveMeetingRoomComponent implements OnInit, OnDestroy {
       const originalVideo = this.localStream.getVideoTracks()[0];
       const sender = this.peerConnection?.getSenders().find(s => s.track?.kind === 'video');
       if (sender && originalVideo) {
-        sender.replaceTrack(originalVideo);
+        await sender.replaceTrack(originalVideo);
         originalVideo.enabled = this.isCameraOn;
       }
     }
+
+    this.sendOffer();
 
     this.api.sendSignal(this.roomKey, {
       type: 'SCREEN_STOP',
@@ -1016,6 +1196,7 @@ export class LiveMeetingRoomComponent implements OnInit, OnDestroy {
     this.decisionLoading = true;
     this.api.selectRound4Candidate(this.jobId, this.applicantId).subscribe({
       next: () => {
+        this.api.sendSignal(this.roomKey, { type: 'INTERVIEW_COMPLETED', senderId: this.clientId }).subscribe();
         alert('🎉 Candidate officially Hired! Offer email dispatched.');
         this.decisionLoading = false;
         this.leaveMeeting();
@@ -1032,6 +1213,7 @@ export class LiveMeetingRoomComponent implements OnInit, OnDestroy {
     this.decisionLoading = true;
     this.api.rejectRound4Candidate(this.jobId, this.applicantId).subscribe({
       next: () => {
+        this.api.sendSignal(this.roomKey, { type: 'INTERVIEW_COMPLETED', senderId: this.clientId }).subscribe();
         alert('Candidate marked as Rejected.');
         this.decisionLoading = false;
         this.leaveMeeting();
@@ -1043,12 +1225,40 @@ export class LiveMeetingRoomComponent implements OnInit, OnDestroy {
     });
   }
 
+  endAndMarkDone() {
+    if (!confirm('Are you sure you want to mark this interview as COMPLETED? The meeting link will be expired.')) return;
+    this.decisionLoading = true;
+    this.api.markInterviewCompleted(this.jobId, this.applicantId).subscribe({
+      next: () => {
+        this.api.sendSignal(this.roomKey, { type: 'INTERVIEW_COMPLETED', senderId: this.clientId }).subscribe();
+        alert('Interview marked as COMPLETED! Meeting link is now expired.');
+        this.decisionLoading = false;
+        this.leaveMeeting();
+      },
+      error: () => {
+        this.decisionLoading = false;
+        this.leaveMeeting();
+      }
+    });
+  }
+
   leaveMeeting() {
-    this.cleanupMeeting();
     if (this.isRecruiter) {
-      this.router.navigate(['/recruiter/applicants', this.jobId]);
+      // Instantly deactivate meeting link when recruiter leaves meeting call
+      this.api.markInterviewCompleted(this.jobId, this.applicantId).subscribe({
+        next: () => {
+          this.api.sendSignal(this.roomKey, { type: 'INTERVIEW_COMPLETED', senderId: this.clientId }).subscribe();
+          this.cleanupMeeting();
+          this.router.navigate(['/recruiter/applicants', this.jobId]);
+        },
+        error: () => {
+          this.cleanupMeeting();
+          this.router.navigate(['/recruiter/applicants', this.jobId]);
+        }
+      });
     } else {
-      this.router.navigate(['/my-applications']);
+      this.cleanupMeeting();
+      this.router.navigate(['/applicant/my-applications']);
     }
   }
 

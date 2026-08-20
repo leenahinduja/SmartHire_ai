@@ -62,6 +62,21 @@ export class ApiService {
     return this.http.post(`${this.BASE}/applicant/upload-resume`, fd, this.options);
   }
 
+  getApplicantStatus(jobId: number): Observable<any> {
+    return new Observable(observer => {
+      this.getMyApplications().subscribe({
+        next: (apps: any[]) => {
+          const found = (apps || []).find(a => Number(a.jobId || a.job_id || a.id) === Number(jobId));
+          observer.next(found || {});
+          observer.complete();
+        },
+        error: (err) => {
+          observer.error(err);
+        }
+      });
+    });
+  }
+
   // ── ATS ───────────────────────────────────────
   calculateAts(resume: File, jobDescription: string, applicantId: number, jobId: number): Observable<any> {
     const fd = new FormData();
@@ -177,6 +192,11 @@ export class ApiService {
   rejectRound4Candidate(jobId: number, applicantId: number): Observable<any> {
     return this.http.post(`${this.BASE}/interview/reject`, { jobId, applicantId }, this.options).pipe(
       catchError(() => this.http.post(`http://localhost:8082/interview/reject`, { jobId, applicantId }, this.options))
+    );
+  }
+  markInterviewCompleted(jobId: number, applicantId: number): Observable<any> {
+    return this.http.post(`${this.BASE}/interview/complete`, { jobId, applicantId }, this.options).pipe(
+      catchError(() => this.http.post(`http://localhost:8082/interview/complete`, { jobId, applicantId }, this.options))
     );
   }
   scheduleInterviewSlot(payload: { jobId: number; slotDate: string; startTime: string; endTime: string; meetingLink?: string }): Observable<any> {

@@ -77,6 +77,11 @@ export class ApiService {
     });
   }
 
+  // ── PYTHON OPENCV PROCTORING SERVICE ────────────────────────
+  analyzeProctorFrameWithPython(base64Image: string): Observable<any> {
+    return this.http.post('http://localhost:5000/api/proctor/analyze', { image: base64Image });
+  }
+
   // ── ATS ───────────────────────────────────────
   calculateAts(resume: File, jobDescription: string, applicantId: number, jobId: number): Observable<any> {
     const fd = new FormData();

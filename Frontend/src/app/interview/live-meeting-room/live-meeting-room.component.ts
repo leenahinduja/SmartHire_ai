@@ -574,6 +574,10 @@ export class LiveMeetingRoomComponent implements OnInit, OnDestroy {
   warningTimeout: any = null;
   isMeetingExpired = false;
 
+  multiPersonConsecCount = 0;
+  lookingAwayConsecCount = 0;
+  noPersonConsecCount = 0;
+
   isRemoteCameraOn = true;
   isRemoteMicOn = true;
 
@@ -707,67 +711,63 @@ export class LiveMeetingRoomComponent implements OnInit, OnDestroy {
     const video = this.localVideoRef.nativeElement;
     if (!video || video.paused || video.ended || !video.videoWidth) return;
 
-    // 1. Native FaceDetector API if supported (Chrome/Edge)
+    // 1. Send Frame to Python OpenCV AI Microservice (Port 5000)
+    try {
+      if (!this.offscreenCanvas) {
+        this.offscreenCanvas = document.createElement('canvas');
+        this.offscreenCanvas.width = 320;
+        this.offscreenCanvas.height = 240;
+      }
+
+      const ctx = this.offscreenCanvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(video, 0, 0, 320, 240);
+        const base64Image = this.offscreenCanvas.toDataURL('image/jpeg', 0.7);
+
+        this.api.analyzeProctorFrameWithPython(base64Image).subscribe({
+          next: (res: any) => {
+            if (res && res.status === 'MULTIPLE_PEOPLE') {
+              this.multiPersonConsecCount++;
+              if (this.multiPersonConsecCount >= 2) {
+                this.multiPersonConsecCount = 0;
+                this.recordCandidateViolation(res.message || 'Multiple people detected in camera frame');
+              }
+            } else if (res && res.status === 'PHONE_DETECTED') {
+              this.recordCandidateViolation(res.message || 'Mobile phone / electronic device detected in camera frame');
+            } else if (res && res.status === 'LOOKING_AWAY') {
+              this.lookingAwayConsecCount++;
+              if (this.lookingAwayConsecCount >= 3) {
+                this.lookingAwayConsecCount = 0;
+                this.recordCandidateViolation('Candidate looking away / head turned off-screen');
+              }
+            } else if (res && res.status === 'NO_PERSON') {
+              this.noPersonConsecCount++;
+              if (this.noPersonConsecCount >= 3) {
+                this.noPersonConsecCount = 0;
+                this.recordCandidateViolation('Candidate missing / absent from camera frame');
+              }
+            } else {
+              this.multiPersonConsecCount = Math.max(0, this.multiPersonConsecCount - 1);
+              this.lookingAwayConsecCount = Math.max(0, this.lookingAwayConsecCount - 1);
+              this.noPersonConsecCount = Math.max(0, this.noPersonConsecCount - 1);
+            }
+          },
+          error: () => {}
+        });
+      }
+    } catch (e) {
+      console.warn('Python OpenCV frame capture fallback:', e);
+    }
+
+    // 2. Native FaceDetector API fallback (Chrome/Edge)
     if ('FaceDetector' in window) {
       try {
         const faceDetector = new (window as any).FaceDetector({ fastMode: true, maxFaces: 5 });
         const faces = await faceDetector.detect(video);
         if (faces && faces.length > 1) {
           this.recordCandidateViolation(`Multiple people (${faces.length} faces) detected in camera frame`);
-          return;
         }
-      } catch (e) {
-        // Fall back to spatial feature analyzer
-      }
-    }
-
-    // 2. Canvas Spatial Skin-Cluster Detector
-    try {
-      if (!this.offscreenCanvas) {
-        this.offscreenCanvas = document.createElement('canvas');
-        this.offscreenCanvas.width = 160;
-        this.offscreenCanvas.height = 120;
-      }
-
-      const ctx = this.offscreenCanvas.getContext('2d');
-      if (!ctx) return;
-
-      ctx.drawImage(video, 0, 0, 160, 120);
-      const imgData = ctx.getImageData(0, 0, 160, 120);
-      const pixels = imgData.data;
-
-      let leftSkinMass = 0;
-      let rightSkinMass = 0;
-      let centerSkinMass = 0;
-
-      for (let y = 15; y < 105; y += 3) {
-        for (let x = 10; x < 150; x += 3) {
-          const idx = (y * 160 + x) * 4;
-          const r = pixels[idx];
-          const g = pixels[idx + 1];
-          const b = pixels[idx + 2];
-
-          const isSkin = (r > 60 && g > 35 && b > 20 && r > g && r > b && (Math.max(r, g, b) - Math.min(r, g, b) > 15) && Math.abs(r - g) > 15);
-
-          if (isSkin) {
-            if (x < 65) leftSkinMass++;
-            else if (x > 95) rightSkinMass++;
-            else centerSkinMass++;
-          }
-        }
-      }
-
-      if (leftSkinMass > 80 && rightSkinMass > 80 && centerSkinMass < 30) {
-        this.multiPersonConsecCount++;
-        if (this.multiPersonConsecCount >= 2) {
-          this.multiPersonConsecCount = 0;
-          this.recordCandidateViolation('Multiple people / extra person detected in camera frame');
-        }
-      } else {
-        this.multiPersonConsecCount = Math.max(0, this.multiPersonConsecCount - 1);
-      }
-    } catch (err) {
-      console.warn('Multi-person detection error:', err);
+      } catch (e) {}
     }
   }
 

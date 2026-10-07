@@ -1066,29 +1066,57 @@ export class CodingTestComponent implements OnInit, OnDestroy {
       faceCount = this.analyzeCanvasFrameForFaces(video);
     }
 
-    this.detectedFaceCount = faceCount;
+    // 1. Send base64 camera frame to Python OpenCV AI Server
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = 320;
+      canvas.height = 240;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(video, 0, 0, 320, 240);
+        const base64Image = canvas.toDataURL('image/jpeg', 0.7);
 
-    if (faceCount === 1) {
-      this.proctorFaceStatus = 'verified';
-      this.proctorStatusMessage = 'Candidate Verified (1 Person)';
-      this.multipleFaceWarning = false;
-      this.noFaceWarning = false;
-      this.consecutiveNoFaceTicks = 0;
-    } else if (faceCount > 1) {
-      this.proctorFaceStatus = 'multiple';
-      this.proctorStatusMessage = `Violation: ${faceCount} People in Frame!`;
-      this.multipleFaceWarning = true;
-      this.noFaceWarning = false;
-      this.violations++;
-    } else {
-      this.consecutiveNoFaceTicks++;
-      // If no face detected for > 3 consecutive scans (~4.5s), trigger warning
-      if (this.consecutiveNoFaceTicks >= 2) {
-        this.proctorFaceStatus = 'empty';
-        this.proctorStatusMessage = 'Warning: No Face Detected';
-        this.noFaceWarning = true;
-        this.multipleFaceWarning = false;
+        this.api.analyzeProctorFrameWithPython(base64Image).subscribe({
+          next: (res: any) => {
+            if (res && res.status === 'MULTIPLE_PEOPLE') {
+              this.proctorFaceStatus = 'multiple';
+              this.proctorStatusMessage = res.message || `Violation: ${res.face_count} People in Frame!`;
+              this.multipleFaceWarning = true;
+              this.noFaceWarning = false;
+              this.violations++;
+            } else if (res && res.status === 'PHONE_DETECTED') {
+              this.proctorFaceStatus = 'multiple';
+              this.proctorStatusMessage = res.message || 'Violation: Mobile Phone Detected!';
+              this.multipleFaceWarning = true;
+              this.noFaceWarning = false;
+              this.violations++;
+            } else if (res && res.status === 'LOOKING_AWAY') {
+              this.proctorFaceStatus = 'empty';
+              this.proctorStatusMessage = res.message || 'Warning: Looking Away From Screen';
+              this.noFaceWarning = true;
+              this.multipleFaceWarning = false;
+            } else if (res && res.status === 'NO_PERSON') {
+              this.consecutiveNoFaceTicks++;
+              if (this.consecutiveNoFaceTicks >= 2) {
+                this.proctorFaceStatus = 'empty';
+                this.proctorStatusMessage = 'Warning: No Face Detected';
+                this.noFaceWarning = true;
+                this.multipleFaceWarning = false;
+                this.violations++;
+              }
+            } else {
+              this.proctorFaceStatus = 'verified';
+              this.proctorStatusMessage = 'Candidate Verified (1 Person)';
+              this.multipleFaceWarning = false;
+              this.noFaceWarning = false;
+              this.consecutiveNoFaceTicks = 0;
+            }
+          },
+          error: () => {}
+        });
       }
+    } catch (e) {
+      console.warn('Python OpenCV frame capture error:', e);
     }
   }
 

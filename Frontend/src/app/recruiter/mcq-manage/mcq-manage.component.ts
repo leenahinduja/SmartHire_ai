@@ -193,7 +193,14 @@ export class McqManageComponent implements OnInit {
   saving = false; releasing = false;
   releaseMsg = ''; error = '';
 
-    calculateDuration(start: string, end: string): number {
+  formatLocalISO(dateInput: any): string {
+    if (!dateInput) return '';
+    const d = new Date(dateInput);
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }
+
+  calculateDuration(start: string, end: string): number {
     const s = new Date(start).getTime();
     const e = new Date(end).getTime();
     return Math.floor((e - s) / (1000 * 60));
@@ -239,8 +246,8 @@ export class McqManageComponent implements OnInit {
         formData.endTime
       ),
       totalMarks: formData.questionCount * 1,
-      startTime: new Date(formData.startTime).toISOString(),
-      endTime: new Date(formData.endTime).toISOString()
+      startTime: this.formatLocalISO(formData.startTime),
+      endTime: this.formatLocalISO(formData.endTime)
     };
 
     // STEP 1: Create Test

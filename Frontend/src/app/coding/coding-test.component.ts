@@ -50,15 +50,23 @@ import { ApiService } from '../shared/services/api.service';
     </header>
 
     <!-- Proctor warning banners -->
-    <div class="proctor-banner multiple-alert" *ngIf="multipleFaceWarning && started && !alreadySubmitted">
+    <div class="proctor-banner phone-alert" *ngIf="phoneWarning && started && !alreadySubmitted">
+      🚨 <b>OBJECT DETECTED:</b> Mobile phone or unauthorized object detected in camera view! Please remove it immediately.
+    </div>
+
+    <div class="proctor-banner gaze-alert" *ngIf="gazeWarning && !phoneWarning && started && !alreadySubmitted">
+      👀 <b>EYE SIGHT WARNING:</b> Looking away from screen detected! Please keep your eyes focused on the test screen.
+    </div>
+
+    <div class="proctor-banner multiple-alert" *ngIf="multipleFaceWarning && !phoneWarning && started && !alreadySubmitted">
       🚨 <b>CRITICAL PROCTOR VIOLATION:</b> Multiple persons ({{ detectedFaceCount }}) detected in camera view! Only the candidate is permitted in frame.
     </div>
 
-    <div class="proctor-banner no-face-alert" *ngIf="noFaceWarning && !multipleFaceWarning && started && !alreadySubmitted">
+    <div class="proctor-banner no-face-alert" *ngIf="noFaceWarning && !multipleFaceWarning && !phoneWarning && !gazeWarning && started && !alreadySubmitted">
       ⚠️ <b>WARNING:</b> No face detected in camera view. Please remain seated and centered in front of your camera.
     </div>
 
-    <div class="proctor-banner" *ngIf="violations > 0 && !multipleFaceWarning && !noFaceWarning && started && !alreadySubmitted">
+    <div class="proctor-banner" *ngIf="violations > 0 && !multipleFaceWarning && !noFaceWarning && !phoneWarning && !gazeWarning && started && !alreadySubmitted">
       ⚠️ Warning: {{ violations }} proctor violation(s) detected and logged.
     </div>
 
@@ -511,6 +519,14 @@ import { ApiService } from '../shared/services/api.service';
     .proctor-banner.multiple-alert {
       background: #dc2626; color: #fff; border-bottom: 2px solid #b91c1c; font-weight: 500;
       animation: pulseAlert 1s infinite alternate;
+    }
+    .proctor-banner.phone-alert {
+      background: #dc2626; color: #fff; border-bottom: 2px solid #b91c1c; font-weight: 700;
+      animation: pulseAlert 1s infinite alternate;
+    }
+    .proctor-banner.gaze-alert {
+      background: #d97706; color: #fff; border-bottom: 2px solid #b45309; font-weight: 700;
+      animation: pulseAlert 1.2s infinite alternate;
     }
     .proctor-banner.no-face-alert {
       background: #d97706; color: #fff; border-bottom: 2px solid #b45309; font-weight: 500;
@@ -974,6 +990,8 @@ export class CodingTestComponent implements OnInit, OnDestroy {
   proctorStatusMessage: string = 'Candidate Verified (1 Person)';
   multipleFaceWarning: boolean = false;
   noFaceWarning: boolean = false;
+  phoneWarning: boolean = false;
+  gazeWarning: boolean = false;
   consecutiveNoFaceTicks: number = 0;
 
   // Timer countdown (e.g. 60 minutes)
@@ -1078,23 +1096,31 @@ export class CodingTestComponent implements OnInit, OnDestroy {
 
         this.api.analyzeProctorFrameWithPython(base64Image).subscribe({
           next: (res: any) => {
-            if (res && res.status === 'MULTIPLE_PEOPLE') {
+            if (res && res.status === 'PHONE_DETECTED') {
               this.proctorFaceStatus = 'multiple';
-              this.proctorStatusMessage = res.message || `Violation: ${res.face_count} People in Frame!`;
-              this.multipleFaceWarning = true;
-              this.noFaceWarning = false;
-              this.violations++;
-            } else if (res && res.status === 'PHONE_DETECTED') {
-              this.proctorFaceStatus = 'multiple';
-              this.proctorStatusMessage = res.message || 'Violation: Mobile Phone Detected!';
-              this.multipleFaceWarning = true;
+              this.proctorStatusMessage = 'Violation: Object / Phone Detected!';
+              this.phoneWarning = true;
+              this.gazeWarning = false;
+              this.multipleFaceWarning = false;
               this.noFaceWarning = false;
               this.violations++;
             } else if (res && res.status === 'LOOKING_AWAY') {
               this.proctorFaceStatus = 'empty';
-              this.proctorStatusMessage = res.message || 'Warning: Looking Away From Screen';
-              this.noFaceWarning = true;
+              this.proctorStatusMessage = 'Warning: Eye Gaze Off-Screen';
+              this.gazeWarning = true;
+              this.phoneWarning = false;
+              this.noFaceWarning = false;
               this.multipleFaceWarning = false;
+              this.violations++;
+            } else if (res && res.status === 'MULTIPLE_PEOPLE') {
+              this.detectedFaceCount = res.face_count || 2;
+              this.proctorFaceStatus = 'multiple';
+              this.proctorStatusMessage = res.message || `Violation: ${res.face_count} People in Frame!`;
+              this.multipleFaceWarning = true;
+              this.phoneWarning = false;
+              this.gazeWarning = false;
+              this.noFaceWarning = false;
+              this.violations++;
             } else if (res && res.status === 'NO_PERSON') {
               this.consecutiveNoFaceTicks++;
               if (this.consecutiveNoFaceTicks >= 2) {
@@ -1102,6 +1128,8 @@ export class CodingTestComponent implements OnInit, OnDestroy {
                 this.proctorStatusMessage = 'Warning: No Face Detected';
                 this.noFaceWarning = true;
                 this.multipleFaceWarning = false;
+                this.phoneWarning = false;
+                this.gazeWarning = false;
                 this.violations++;
               }
             } else {
@@ -1109,6 +1137,8 @@ export class CodingTestComponent implements OnInit, OnDestroy {
               this.proctorStatusMessage = 'Candidate Verified (1 Person)';
               this.multipleFaceWarning = false;
               this.noFaceWarning = false;
+              this.phoneWarning = false;
+              this.gazeWarning = false;
               this.consecutiveNoFaceTicks = 0;
             }
           },

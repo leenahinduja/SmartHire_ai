@@ -14,7 +14,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Enable CORS for Angular Frontend (localhost:4200) & Spring Boot (localhost:8082)
+# Enable CORS for Angular Frontend (localhost:4200 & 127.0.0.1:4200) & Spring Boot (localhost:8082)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -43,8 +43,13 @@ def analyze_frame_json(payload: FrameRequest):
     try:
         img_matrix = decode_base64_image(payload.image)
         result = analyze_frame_opencv(img_matrix)
+        status = result.get("status", "UNKNOWN")
+        faces = result.get("face_count", 0)
+        msg = result.get("message", "")
+        print(f"[Proctor AI] Status: {status} | Faces: {faces} | Msg: {msg}")
         return result
     except Exception as e:
+        print(f"[Proctor AI ERROR] {str(e)}")
         return {
             "status": "ERROR",
             "face_count": 0,
@@ -77,7 +82,7 @@ async def websocket_proctor_endpoint(websocket: WebSocket):
     Real-time WebSocket endpoint for continuous frame streaming from Angular meeting room.
     """
     await websocket.accept()
-    print("🔌 WebSocket Client Connected to Python OpenCV Proctor Service")
+    print("WebSocket Client Connected to Python OpenCV Proctor Service")
     try:
         while True:
             data = await websocket.receive_text()
@@ -92,8 +97,8 @@ async def websocket_proctor_endpoint(websocket: WebSocket):
                 result = analyze_frame_opencv(img_matrix)
                 await websocket.send_text(json.dumps(result))
     except WebSocketDisconnect:
-        print("🔌 WebSocket Client Disconnected")
+        print("WebSocket Client Disconnected")
 
 if __name__ == "__main__":
-    print("🚀 Starting SmartHire AI Python OpenCV Proctor Service on http://localhost:5000 ...")
+    print("Starting SmartHire AI Python OpenCV Proctor Service on http://127.0.0.1:5000 ...")
     uvicorn.run("main:app", host="0.0.0.0", port=5000, reload=True)

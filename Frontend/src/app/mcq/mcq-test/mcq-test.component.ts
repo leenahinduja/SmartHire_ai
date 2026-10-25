@@ -64,15 +64,23 @@ import { ApiService } from '../../shared/services/api.service';
       </app-system-check>
 
       <!-- Proctor warning banners -->
-      <div class="proctor-banner multiple-alert" *ngIf="multipleFaceWarning && started && !submitted">
+      <div class="proctor-banner phone-alert" *ngIf="phoneWarning && started && !submitted">
+        🚨 <b>OBJECT DETECTED:</b> Mobile phone or unauthorized object detected in camera view! Please remove it immediately.
+      </div>
+
+      <div class="proctor-banner gaze-alert" *ngIf="gazeWarning && !phoneWarning && started && !submitted">
+        👀 <b>EYE SIGHT WARNING:</b> Looking away from screen detected! Please keep your eyes focused on the test screen.
+      </div>
+
+      <div class="proctor-banner multiple-alert" *ngIf="multipleFaceWarning && !phoneWarning && started && !submitted">
         🚨 <b>CRITICAL PROCTOR VIOLATION:</b> Multiple persons ({{ detectedFaceCount }}) detected in camera view! Only the candidate is permitted in frame.
       </div>
 
-      <div class="proctor-banner no-face-alert" *ngIf="noFaceWarning && !multipleFaceWarning && started && !submitted">
+      <div class="proctor-banner no-face-alert" *ngIf="noFaceWarning && !multipleFaceWarning && !phoneWarning && !gazeWarning && started && !submitted">
         ⚠️ <b>WARNING:</b> No face detected in camera view. Please remain seated and centered in front of your camera.
       </div>
 
-      <div class="proctor-banner" *ngIf="violations > 0 && !multipleFaceWarning && !noFaceWarning && started && !submitted">
+      <div class="proctor-banner" *ngIf="violations > 0 && !multipleFaceWarning && !noFaceWarning && !phoneWarning && !gazeWarning && started && !submitted">
         ⚠️ Warning: {{ violations }} proctor violation(s) detected and logged.
       </div>
 
@@ -232,10 +240,17 @@ import { ApiService } from '../../shared/services/api.service';
     .proctor-banner.multiple-alert {
       background: rgba(220, 38, 38, 0.9); border-bottom: 2px solid #ef4444; color: #fff; animation: pulseRed 1.2s infinite;
     }
+    .proctor-banner.phone-alert {
+      background: rgba(220, 38, 38, 0.95); border-bottom: 2px solid #ef4444; color: #fff; font-weight: 700; animation: pulseRed 1.2s infinite;
+    }
+    .proctor-banner.gaze-alert {
+      background: rgba(217, 119, 6, 0.95); border-bottom: 2px solid #b45309; color: #fff; font-weight: 700; animation: pulseAmber 1.4s infinite;
+    }
     .proctor-banner.no-face-alert {
       background: rgba(245, 158, 11, 0.9); border-bottom: 2px solid #f59e0b; color: #000; font-weight: 700;
     }
     @keyframes pulseRed { 0%, 100% { background: rgba(220, 38, 38, 0.95); } 50% { background: rgba(185, 28, 28, 0.85); } }
+    @keyframes pulseAmber { 0%, 100% { background: rgba(217, 119, 6, 0.95); } 50% { background: rgba(180, 83, 9, 0.85); } }
 
     /* Top Bar */
     .test-topbar {
@@ -400,6 +415,8 @@ export class McqTestComponent implements OnInit, OnDestroy {
   proctorStatusMessage = 'Candidate Verified (1 Person)';
   multipleFaceWarning = false;
   noFaceWarning = false;
+  phoneWarning = false;
+  gazeWarning = false;
   detectedFaceCount = 1;
   consecutiveNoFaceTicks = 0;
   violations = 0;
@@ -550,26 +567,34 @@ export class McqTestComponent implements OnInit, OnDestroy {
 
         this.api.analyzeProctorFrameWithPython(base64Image).subscribe({
           next: (res: any) => {
-            if (res && res.status === 'MULTIPLE_PEOPLE') {
+            if (res && res.status === 'PHONE_DETECTED') {
+              this.proctorFaceStatus = 'multiple';
+              this.proctorStatusMessage = 'Violation: Object / Phone Detected!';
+              this.phoneWarning = true;
+              this.gazeWarning = false;
+              this.multipleFaceWarning = false;
+              this.noFaceWarning = false;
+              this.violations++;
+              this.logViolation('PHONE_DETECTED', res.message || 'Mobile phone or unauthorized object detected in camera view');
+            } else if (res && res.status === 'LOOKING_AWAY') {
+              this.proctorFaceStatus = 'empty';
+              this.proctorStatusMessage = 'Warning: Eye Gaze Off-Screen';
+              this.gazeWarning = true;
+              this.phoneWarning = false;
+              this.multipleFaceWarning = false;
+              this.noFaceWarning = false;
+              this.violations++;
+              this.logViolation('LOOKING_AWAY', res.message || 'Eye sight / gaze deviated away from screen');
+            } else if (res && res.status === 'MULTIPLE_PEOPLE') {
+              this.detectedFaceCount = res.face_count || 2;
               this.proctorFaceStatus = 'multiple';
               this.proctorStatusMessage = res.message || `Violation: ${res.face_count} People in Frame!`;
               this.multipleFaceWarning = true;
+              this.phoneWarning = false;
+              this.gazeWarning = false;
               this.noFaceWarning = false;
               this.violations++;
               this.logViolation('MULTIPLE_PERSONS', res.message || 'Multiple persons detected in camera view');
-            } else if (res && res.status === 'PHONE_DETECTED') {
-              this.proctorFaceStatus = 'multiple';
-              this.proctorStatusMessage = res.message || 'Violation: Mobile Phone Detected!';
-              this.multipleFaceWarning = true;
-              this.noFaceWarning = false;
-              this.violations++;
-              this.logViolation('PHONE_DETECTED', res.message || 'Mobile phone detected in camera view');
-            } else if (res && res.status === 'LOOKING_AWAY') {
-              this.proctorFaceStatus = 'empty';
-              this.proctorStatusMessage = res.message || 'Warning: Looking Away From Screen';
-              this.noFaceWarning = true;
-              this.multipleFaceWarning = false;
-              this.logViolation('LOOKING_AWAY', 'Head or eye gaze turned off-screen');
             } else if (res && res.status === 'NO_PERSON') {
               this.consecutiveNoFaceTicks++;
               if (this.consecutiveNoFaceTicks >= 2) {
@@ -577,6 +602,8 @@ export class McqTestComponent implements OnInit, OnDestroy {
                 this.proctorStatusMessage = 'Warning: No Face Detected';
                 this.noFaceWarning = true;
                 this.multipleFaceWarning = false;
+                this.phoneWarning = false;
+                this.gazeWarning = false;
                 this.violations++;
                 this.logViolation('NO_FACE', 'Candidate missing from camera view');
               }
@@ -585,6 +612,8 @@ export class McqTestComponent implements OnInit, OnDestroy {
               this.proctorStatusMessage = 'Candidate Verified (1 Person)';
               this.multipleFaceWarning = false;
               this.noFaceWarning = false;
+              this.phoneWarning = false;
+              this.gazeWarning = false;
               this.consecutiveNoFaceTicks = 0;
             }
           },

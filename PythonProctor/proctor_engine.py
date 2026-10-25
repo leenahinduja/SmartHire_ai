@@ -20,38 +20,139 @@ def decode_base64_image(base64_str: str):
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
     return img
 
-def detect_mobile_phone_contours(image_matrix, gray):
+def detect_mobile_phone_contours(image_matrix, gray, face_boxes=None):
     """
-    Detects handheld rectangular mobile phone / tablet shapes near face/hands
-    using edge detection, aspect ratio analysis, and contour area thresholds.
+    Detects handheld rectangular mobile phone / tablet / unauthorized device
+    using edge detection, adaptive thresholding, aspect ratio (~1.35 to 2.9),
+    and rotated minimum bounding rectangle analysis.
     """
     try:
-        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-        edged = cv2.Canny(blurred, 50, 150)
-        contours, _ = cv2.findContours(edged.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        
         h_img, w_img = gray.shape
+        total_area = float(h_img * w_img)
+
+        # 1. Edge detection with dual Canny and Adaptive Threshold for dark/lit screens
+        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+        edged = cv2.Canny(blurred, 30, 120)
+        thresh = cv2.adaptiveThreshold(blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+        combined_edges = cv2.bitwise_or(edged, cv2.Canny(thresh, 30, 120))
+
+        # Dilate slightly to bridge small gaps caused by fingers holding the phone
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+        dilated = cv2.dilate(combined_edges, kernel, iterations=1)
+
+        # RETR_TREE captures both exterior phone border and interior lit screen rectangle
+        contours, _ = cv2.findContours(dilated, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
         for c in contours:
-            peri = cv2.arcLength(c, True)
-            approx = cv2.approxPolyDP(c, 0.04 * peri, True)
+            area = cv2.contourArea(c)
+            # Area must be between 0.6% and 35% of total webcam frame
+            if area < (total_area * 0.006) or area > (total_area * 0.35):
+                continue
 
-            # Mobile phones are 4-sided quadrilaterals
-            if len(approx) == 4:
-                x, y, w, h = cv2.boundingRect(approx)
-                area = w * h
-                
-                # Check bounding box dimensions matching typical smartphone aspect ratio (~1.7 to 2.4)
-                if area > 1200 and area < (w_img * h_img * 0.35):
-                    aspect_ratio = float(h) / w if w > 0 else 0
-                    inv_aspect_ratio = float(w) / h if h > 0 else 0
-                    
-                    if (1.5 <= aspect_ratio <= 2.5) or (1.5 <= inv_aspect_ratio <= 2.5):
-                        # Verify phone location (must be visible in camera frame)
-                        return True
+            # Rotated bounding rectangle for angled/handheld phones
+            rect = cv2.minAreaRect(c)
+            (cx, cy), (w, h), angle = rect
+
+            side_short = min(w, h)
+            side_long = max(w, h)
+
+            if side_short < 18 or side_long < 35:
+                continue
+
+            aspect_ratio = side_long / side_short
+
+            # Mobile phones typically have aspect ratios from 1.35 to 2.85
+            if 1.35 <= aspect_ratio <= 2.85:
+                rect_area = side_short * side_long
+                extent = area / rect_area if rect_area > 0 else 0
+
+                # Check polygon approximation
+                peri = cv2.arcLength(c, True)
+                approx = cv2.approxPolyDP(c, 0.04 * peri, True)
+
+                # Rectangular contour with 4 to 8 vertices or good rectangle extent
+                if extent >= 0.45 or (4 <= len(approx) <= 8 and cv2.isContourConvex(approx)):
+                    # Ensure candidate's own forehead/eyes aren't flagged as a phone
+                    if face_boxes:
+                        inside_face = False
+                        for (fx, fy, fw, fh) in face_boxes:
+                            if fx <= cx <= fx + fw and fy <= cy <= fy + fh:
+                                inside_face = True
+                                break
+                        if inside_face:
+                            continue
+
+                    return True
     except Exception:
         pass
     return False
+
+def analyze_eye_gaze(gray, face_box):
+    """
+    Analyzes eye regions and pupil positioning to detect suspicious eye sight / gaze:
+    - Looking straight at screen (OK)
+    - Looking left / right away from screen (Looking Away)
+    - Looking down at desk / phone / notes (Looking Away)
+    - Eyes closed or head tilted sideways (Looking Away)
+    Returns: (is_looking_away, reason)
+    """
+    x, y, w, h = face_box
+    if w <= 0 or h <= 0:
+        return False, None
+
+    # 1. Check if face is significantly displaced from center of webcam frame (> 24% offset)
+    img_center_x = gray.shape[1] / 2.0
+    face_center_x = x + (w / 2.0)
+    if abs(face_center_x - img_center_x) > (gray.shape[1] * 0.24):
+        return True, "Head positioned off-center"
+
+    # 2. Extract upper 55% of the face (eye zone)
+    upper_face_h = int(h * 0.55)
+    roi_gray = gray[y : y + upper_face_h, x : x + w]
+
+    min_eye_size = max(10, int(w * 0.10))
+    eyes = eye_cascade.detectMultiScale(
+        roi_gray,
+        scaleFactor=1.08,
+        minNeighbors=2,
+        minSize=(min_eye_size, min_eye_size)
+    )
+
+    # If face is clearly visible but 0 eyes are detected in the eye region,
+    # the candidate is either looking down (eyelids lowered), eyes closed, or head tilted away
+    if len(eyes) == 0:
+        return True, "Eyes not visible or looking down"
+
+    deviated_count = 0
+    valid_eyes = 0
+
+    for (ex, ey, ew, eh) in eyes:
+        if ew < 10 or eh < 10:
+            continue
+
+        eye_roi = roi_gray[ey : ey + eh, ex : ex + ew]
+        blurred = cv2.GaussianBlur(eye_roi, (5, 5), 0)
+
+        # In grayscale, pupil & iris represent the darkest region in the eye socket
+        min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(blurred)
+
+        pupil_x = min_loc[0]
+        pupil_y = min_loc[1]
+
+        ratio_x = float(pupil_x) / float(ew) if ew > 0 else 0.5
+        ratio_y = float(pupil_y) / float(eh) if eh > 0 else 0.5
+
+        valid_eyes += 1
+
+        # Center gaze: pupil is centered horizontally between 0.28 and 0.72
+        # and vertically between 0.18 and 0.72
+        if ratio_x < 0.28 or ratio_x > 0.72 or ratio_y > 0.72 or ratio_y < 0.18:
+            deviated_count += 1
+
+    if valid_eyes > 0 and (deviated_count / valid_eyes) >= 0.5:
+        return True, "Pupil / eye gaze turned away from screen"
+
+    return False, None
 
 def analyze_frame_opencv(image_matrix):
     """
@@ -59,8 +160,8 @@ def analyze_frame_opencv(image_matrix):
     - Single Person (OK)
     - Multiple People (>1 Person -> Anti-cheat violation)
     - No Person (0 People -> Candidate absent)
-    - Looking Away (Head/Eye gaze turned off-screen)
-    - Mobile Phone Detected (Handheld phone shape detected)
+    - Eye Sight / Looking Away (Eyes or head turned away from screen)
+    - Mobile Phone / Object Detected (Handheld device detected)
     """
     if image_matrix is None:
         return {
@@ -79,54 +180,48 @@ def analyze_frame_opencv(image_matrix):
         gray,
         scaleFactor=1.1,
         minNeighbors=5,
-        minSize=(60, 60)
+        minSize=(50, 50)
     )
 
     face_count = len(frontal_faces)
 
-    # Fallback to profile faces if 0 frontal faces detected
+    # Check for sideways profile face if 0 frontal faces detected
     if face_count == 0:
         profile_faces = profile_cascade.detectMultiScale(
             gray,
             scaleFactor=1.1,
             minNeighbors=4,
-            minSize=(60, 60)
+            minSize=(50, 50)
         )
-        face_count = len(profile_faces)
+        if len(profile_faces) >= 1:
+            return {
+                "status": "LOOKING_AWAY",
+                "face_count": 1,
+                "violation": True,
+                "message": "LOOKING AWAY: Profile face / looking away from screen detected!",
+                "timestamp": int(time.time() * 1000)
+            }
 
-    # 2. Check for Mobile Phone Detection
-    phone_detected = detect_mobile_phone_contours(image_matrix, gray)
-    if phone_detected and face_count >= 1:
+    # 2. Check for Mobile Phone / Object Detection
+    phone_detected = detect_mobile_phone_contours(image_matrix, gray, frontal_faces)
+    if phone_detected:
         return {
             "status": "PHONE_DETECTED",
-            "face_count": face_count,
+            "face_count": max(1, face_count),
             "violation": True,
-            "message": "🚨 ANTI-CHEAT ALERT: Mobile phone / electronic device detected in camera frame!",
+            "message": "OBJECT DETECTED: Mobile phone or unauthorized object detected in camera view!",
             "timestamp": int(time.time() * 1000)
         }
 
     # 3. Determine Proctoring & Eye Gaze Status
     if face_count == 1:
-        (x, y, w, h) = frontal_faces[0] if len(frontal_faces) > 0 else (0, 0, 0, 0)
-        
-        # Eye Gaze Analysis inside candidate face bounding box
-        looking_away = False
-        if w > 0 and h > 0:
-            roi_gray = gray[y:y+h, x:x+w]
-            eyes = eye_cascade.detectMultiScale(roi_gray, scaleFactor=1.1, minNeighbors=3, minSize=(15, 15))
-            
-            # If face is present but 0 eyes visible or eyes offset to side, candidate is looking away
-            if len(eyes) == 0:
-                # Check horizontal position of face box relative to image center
-                img_center_x = gray.shape[1] / 2
-                face_center_x = x + (w / 2)
-                if abs(face_center_x - img_center_x) > (gray.shape[1] * 0.22):
-                    looking_away = True
+        face_box = frontal_faces[0]
+        looking_away, reason = analyze_eye_gaze(gray, face_box)
 
         if looking_away:
             status = "LOOKING_AWAY"
             violation = True
-            message = "⚠️ WARNING: Eye gaze / head turning away from screen detected!"
+            message = f"EYE SIGHT WARNING: Looking away from screen detected! ({reason})"
         else:
             status = "SINGLE_PERSON"
             violation = False
@@ -135,11 +230,11 @@ def analyze_frame_opencv(image_matrix):
     elif face_count > 1:
         status = "MULTIPLE_PEOPLE"
         violation = True
-        message = f"🚨 ANTI-CHEAT ALERT: Multiple people ({face_count}) detected in camera frame!"
+        message = f"ANTI-CHEAT ALERT: Multiple people ({face_count}) detected in camera frame!"
     else:
         status = "NO_PERSON"
         violation = True
-        message = "⚠️ WARNING: Candidate missing from camera frame!"
+        message = "WARNING: Candidate missing from camera frame!"
 
     return {
         "status": status,

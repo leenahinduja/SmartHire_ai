@@ -663,7 +663,6 @@ export class LiveMeetingRoomComponent implements OnInit, OnDestroy {
   }
 
   faceCheckInterval: any = null;
-  multiPersonConsecCount = 0;
   offscreenCanvas: HTMLCanvasElement | null = null;
 
   initProctoringListeners() {
@@ -733,12 +732,12 @@ export class LiveMeetingRoomComponent implements OnInit, OnDestroy {
                 this.recordCandidateViolation(res.message || 'Multiple people detected in camera frame');
               }
             } else if (res && res.status === 'PHONE_DETECTED') {
-              this.recordCandidateViolation(res.message || 'Mobile phone / electronic device detected in camera frame');
+              this.recordCandidateViolation(res.message || 'Mobile phone or unauthorized object detected in camera view');
             } else if (res && res.status === 'LOOKING_AWAY') {
               this.lookingAwayConsecCount++;
               if (this.lookingAwayConsecCount >= 3) {
                 this.lookingAwayConsecCount = 0;
-                this.recordCandidateViolation('Candidate looking away / head turned off-screen');
+                this.recordCandidateViolation(res.message || 'Candidate eye sight / looking away from screen detected');
               }
             } else if (res && res.status === 'NO_PERSON') {
               this.noPersonConsecCount++;

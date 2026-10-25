@@ -79,7 +79,9 @@ export class ApiService {
 
   // ── PYTHON OPENCV PROCTORING SERVICE ────────────────────────
   analyzeProctorFrameWithPython(base64Image: string): Observable<any> {
-    return this.http.post('http://localhost:5000/api/proctor/analyze', { image: base64Image });
+    return this.http.post('http://127.0.0.1:5000/api/proctor/analyze', { image: base64Image }).pipe(
+      catchError(() => this.http.post(`${this.BASE}/api/proctor/analyze`, { image: base64Image }))
+    );
   }
 
   // ── ATS ───────────────────────────────────────

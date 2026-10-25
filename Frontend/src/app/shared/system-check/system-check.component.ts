@@ -1,4 +1,5 @@
 import { Component, OnInit, OnDestroy, Output, EventEmitter, Input } from '@angular/core';
+import { ApiService } from '../services/api.service';
 
 @Component({
   selector: 'app-system-check',
@@ -37,7 +38,7 @@ import { Component, OnInit, OnDestroy, Output, EventEmitter, Input } from '@angu
             <div class="sys-card-body">
               <div class="camera-preview-container" *ngIf="hasCameraStream">
                 <video id="sysCameraVideo" autoplay playsinline [muted]="true" class="camera-video"></video>
-                <div class="camera-glow-border" [class.glow-green]="faceCheckStatus === 'verified'" [class.glow-red]="faceCheckStatus === 'black_screen' || faceCheckStatus === 'multiple_faces'" [class.glow-amber]="faceCheckStatus === 'no_face'"></div>
+                <div class="camera-glow-border" [class.glow-green]="faceCheckStatus === 'verified'" [class.glow-red]="faceCheckStatus === 'black_screen' || faceCheckStatus === 'multiple_faces' || faceCheckStatus === 'phone_detected'" [class.glow-amber]="faceCheckStatus === 'no_face' || faceCheckStatus === 'looking_away'"></div>
                 
                 <!-- Live Feedback Pill Overlay -->
                 <div class="face-verification-pill" [ngClass]="faceCheckStatus">
@@ -343,8 +344,10 @@ import { Component, OnInit, OnDestroy, Output, EventEmitter, Input } from '@angu
     .face-verification-pill.verified .dot { background: #10b981; }
     .face-verification-pill.no_face { border-left: 3px solid #f59e0b; }
     .face-verification-pill.no_face .dot { background: #f59e0b; }
-    .face-verification-pill.black_screen, .face-verification-pill.multiple_faces { border-left: 3px solid #ef4444; }
-    .face-verification-pill.black_screen .dot, .face-verification-pill.multiple_faces .dot { background: #ef4444; }
+    .face-verification-pill.black_screen, .face-verification-pill.multiple_faces, .face-verification-pill.phone_detected { border-left: 3px solid #ef4444; }
+    .face-verification-pill.black_screen .dot, .face-verification-pill.multiple_faces .dot, .face-verification-pill.phone_detected .dot { background: #ef4444; }
+    .face-verification-pill.looking_away { border-left: 3px solid #f59e0b; }
+    .face-verification-pill.looking_away .dot { background: #f59e0b; }
 
     /* Mic visualizer */
     .mic-visualizer-container {
@@ -460,7 +463,10 @@ export class SystemCheckComponent implements OnInit, OnDestroy {
   networkStatus: 'pending' | 'checking' | 'success' | 'failed' = 'pending';
 
   hasCameraStream = false;
-  faceCheckStatus: 'checking' | 'verified' | 'black_screen' | 'no_face' | 'multiple_faces' = 'checking';
+  faceCheckStatus: 'checking' | 'verified' | 'black_screen' | 'no_face' | 'multiple_faces' | 'phone_detected' | 'looking_away' = 'checking';
+  private analyzingPython = false;
+
+  constructor(private api: ApiService) {}
   faceFeedbackMsg = 'Scanning camera feed for candidate face...';
   private faceScanInterval: any = null;
   private hiddenCanvas: HTMLCanvasElement = document.createElement('canvas');
@@ -545,8 +551,8 @@ export class SystemCheckComponent implements OnInit, OnDestroy {
     const videoEl = document.getElementById('sysCameraVideo') as HTMLVideoElement;
     if (!videoEl || videoEl.readyState < 2) return;
 
-    const width = 160;
-    const height = 120;
+    const width = 320;
+    const height = 240;
     this.hiddenCanvas.width = width;
     this.hiddenCanvas.height = height;
 
@@ -554,6 +560,48 @@ export class SystemCheckComponent implements OnInit, OnDestroy {
     if (!ctx) return;
 
     ctx.drawImage(videoEl, 0, 0, width, height);
+
+    // Call Python Proctoring Engine for AI Face, Eye Gaze, and Object/Phone Detection
+    if (!this.analyzingPython) {
+      this.analyzingPython = true;
+      const base64Image = this.hiddenCanvas.toDataURL('image/jpeg', 0.7);
+
+      this.api.analyzeProctorFrameWithPython(base64Image).subscribe({
+        next: (res: any) => {
+          this.analyzingPython = false;
+          if (res) {
+            if (res.status === 'PHONE_DETECTED') {
+              this.faceCheckStatus = 'phone_detected';
+              this.faceFeedbackMsg = '🚨 Object / Mobile Phone Detected! Please remove it to proceed.';
+              this.cameraStatus = 'failed';
+            } else if (res.status === 'LOOKING_AWAY') {
+              this.faceCheckStatus = 'looking_away';
+              this.faceFeedbackMsg = '👀 Eye Sight Alert: Looking away! Please look straight at the screen.';
+              this.cameraStatus = 'checking';
+            } else if (res.status === 'MULTIPLE_PEOPLE') {
+              this.faceCheckStatus = 'multiple_faces';
+              this.faceFeedbackMsg = '❌ Multiple Persons (' + (res.face_count || 2) + ') Detected! Only 1 person allowed.';
+              this.cameraStatus = 'failed';
+            } else if (res.status === 'NO_PERSON') {
+              this.faceCheckStatus = 'no_face';
+              this.faceFeedbackMsg = '⚠️ No Face Detected! Position your face in front of the camera.';
+              this.cameraStatus = 'checking';
+            } else if (res.status === 'SINGLE_PERSON') {
+              this.faceCheckStatus = 'verified';
+              this.faceFeedbackMsg = '✅ Face & Eyes Clear (Python AI Verified - 1 Person)';
+              this.cameraStatus = 'success';
+            }
+          }
+        },
+        error: () => {
+          this.analyzingPython = false;
+          this.fallbackLocalFrameAnalysis(ctx, width, height);
+        }
+      });
+    }
+  }
+
+  private fallbackLocalFrameAnalysis(ctx: CanvasRenderingContext2D, width: number, height: number) {
     const imgData = ctx.getImageData(0, 0, width, height);
     const data = imgData.data;
 
@@ -592,7 +640,6 @@ export class SystemCheckComponent implements OnInit, OnDestroy {
 
     const avgBrightness = totalBrightness / totalPixels;
 
-    // 1. Black Screen / Covered Camera Check
     if (avgBrightness < 18) {
       this.faceCheckStatus = 'black_screen';
       this.faceFeedbackMsg = '❌ Pitch Black / Camera Covered. Uncover camera & check lighting.';
@@ -600,7 +647,6 @@ export class SystemCheckComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // 2. Face / Person Silhouette Check (min 2.5% skin coverage)
     const minSkinThreshold = totalPixels * 0.025;
     if (skinPixelCount < minSkinThreshold) {
       this.faceCheckStatus = 'no_face';
@@ -609,16 +655,20 @@ export class SystemCheckComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // 3. Multiple Faces Check
-    const minSideCluster = minSkinThreshold * 0.7;
-    if (leftSkin > minSideCluster && rightSkin > minSideCluster && centerSkin < (leftSkin + rightSkin) * 0.4) {
+    const strongClusterThreshold = totalPixels * 0.08;
+    const centerRequired = totalPixels * 0.04;
+    if (
+      leftSkin > strongClusterThreshold &&
+      rightSkin > strongClusterThreshold &&
+      centerSkin > centerRequired &&
+      Math.abs(leftSkin - rightSkin) < (leftSkin + rightSkin) * 0.6
+    ) {
       this.faceCheckStatus = 'multiple_faces';
       this.faceFeedbackMsg = '❌ Multiple Persons Detected! Only 1 person allowed in view.';
       this.cameraStatus = 'failed';
       return;
     }
 
-    // 4. Single Human Face Verified
     this.faceCheckStatus = 'verified';
     this.faceFeedbackMsg = '✅ Face Clear & Verified (1 Person Detected)';
     this.cameraStatus = 'success';
@@ -694,7 +744,9 @@ export class SystemCheckComponent implements OnInit, OnDestroy {
   }
 
   getCameraStatusText(): string {
-    if (this.faceCheckStatus === 'verified') return 'Verified (Face Clear)';
+    if (this.faceCheckStatus === 'verified') return 'Verified (Face & Eyes Clear)';
+    if (this.faceCheckStatus === 'phone_detected') return 'Object / Phone Detected';
+    if (this.faceCheckStatus === 'looking_away') return 'Looking Away';
     if (this.faceCheckStatus === 'black_screen') return 'Black Screen / Dark';
     if (this.faceCheckStatus === 'multiple_faces') return 'Multiple People';
     if (this.faceCheckStatus === 'no_face') return 'No Face Detected';
